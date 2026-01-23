@@ -1,0 +1,106 @@
+package com.example.project_management_app.controller;
+
+import com.example.project_management_app.dto.LoginRequest;
+import com.example.project_management_app.dto.UserDto;
+import com.example.project_management_app.entity.User;
+import com.example.project_management_app.service.AccountService;
+import com.example.project_management_app.service.EmailService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.HashMap;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/auth")
+public class AuthController {
+
+    private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
+
+    @Autowired
+    private AccountService accountService;
+
+    @Autowired
+    private EmailService emailService;
+
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody UserDto userDto) {
+        try {
+            logger.info("Registering user: {}", userDto.getUsername());
+            User user = accountService.registerUser(userDto);
+            logger.info("User registered successfully: {}", user.getUsername());
+            return ResponseEntity.ok(user);
+        } catch (RuntimeException e) {
+            logger.error("Registration error: {}", e.getMessage());
+            Map<String, String> response = new HashMap<>();
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @PostMapping("/register-with-token")
+    public ResponseEntity<?> registerWithToken(@RequestBody UserDto userDto, @RequestParam String token) {
+        try {
+            if (!emailService.validateInvitationToken(token)) {
+                Map<String, String> response = new HashMap<>();
+                response.put("error", "Invalid or expired invitation token");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            String invitedEmail = emailService.getEmailFromToken(token);
+            if (!invitedEmail.equals(userDto.getEmail())) {
+                Map<String, String> response = new HashMap<>();
+                response.put("error", "Email does not match invitation");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            logger.info("Registering user with invitation token: {}", userDto.getUsername());
+            User user = accountService.registerUser(userDto);
+            logger.info("User registered successfully with invitation: {}", user.getUsername());
+
+            return ResponseEntity.ok(user);
+        } catch (RuntimeException e) {
+            logger.error("Registration with token error: {}", e.getMessage());
+            Map<String, String> response = new HashMap<>();
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
+        try {
+            logger.info("Login attempt for user: {}", loginRequest.getUsername());
+            String token = accountService.loginUser(loginRequest);
+            logger.info("Login successful for user: {}", loginRequest.getUsername());
+
+            Map<String, String> response = new HashMap<>();
+            response.put("token", token);
+            response.put("username", loginRequest.getUsername());
+            response.put("message", "Login successful");
+
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            logger.error("Login error for user {}: {}", loginRequest.getUsername(), e.getMessage());
+            e.printStackTrace();
+
+            Map<String, String> response = new HashMap<>();
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(401).body(response);
+        } catch (Exception e) {
+            logger.error("Unexpected login error: {}", e.getMessage());
+            e.printStackTrace();
+
+            Map<String, String> response = new HashMap<>();
+            response.put("error", "Internal server error");
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    @GetMapping("/test")
+    public ResponseEntity<?> test() {
+        return ResponseEntity.ok("Auth endpoint is working");
+    }
+}
