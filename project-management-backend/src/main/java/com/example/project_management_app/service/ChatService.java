@@ -1,91 +1,121 @@
 package com.example.project_management_app.service;
 
 import com.example.project_management_app.dto.ChatMessage;
+import com.example.project_management_app.entity.Message;
+import com.example.project_management_app.entity.User;
+import com.example.project_management_app.repository.MessageRepository;
+import com.example.project_management_app.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
-import java.util.ArrayList;
-import java.util.HashMap;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
+@Transactional
 public class ChatService {
-    private final Map<Long, List<ChatMessage>> userMessages = new HashMap<>();
-    private final Map<String, List<ChatMessage>> roomMessages = new HashMap<>();
-    private long messageIdCounter = 1;
 
-    public ChatMessage saveMessage(ChatMessage chatMessage) {
-        chatMessage.setId(messageIdCounter++);
+    @Autowired
+    private MessageRepository messageRepository;
 
-        if (chatMessage.getReceiverId() != null) {
-            savePrivateMessage(chatMessage);
-        } else if (chatMessage.getRoomId() != null) {
-            saveRoomMessage(chatMessage);
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
+
+    public ChatMessage saveMessage(ChatMessage chatMessageDto) {
+        User sender = userRepository.findById(chatMessageDto.getSenderId())
+                .orElseThrow(() -> new RuntimeException("Sender not found"));
+        User receiver = userRepository.findById(chatMessageDto.getReceiverId())
+                .orElseThrow(() -> new RuntimeException("Receiver not found"));
+
+        Message message = new Message();
+        message.setContent(chatMessageDto.getContent());
+        message.setSender(sender);
+        message.setReceiver(receiver);
+        message.setType(Message.MessageType.valueOf(chatMessageDto.getType().name()));
+        message.setRead(false);
+
+        Message savedMessage = messageRepository.save(message);
+
+        ChatMessage response = convertToDto(savedMessage);
+        response.setSenderName(sender.getUsername());
+        response.setSenderAvatar(getAvatarUrl(sender));
+
+        // Only send chat notification for CHAT messages, not for project/task notifications
+        if (chatMessageDto.getType() == ChatMessage.MessageType.CHAT) {
+            sendNotification(receiver.getId(), "New message from " + sender.getUsername());
         }
 
-        return chatMessage;
+        return response;
     }
 
-    private void savePrivateMessage(ChatMessage chatMessage) {
-        Long senderId = chatMessage.getSenderId();
-        Long receiverId = chatMessage.getReceiverId();
-
-        userMessages.computeIfAbsent(senderId, k -> new ArrayList<>()).add(chatMessage);
-        userMessages.computeIfAbsent(receiverId, k -> new ArrayList<>()).add(chatMessage);
+    public List<ChatMessage> getConversation(Long user1Id, Long user2Id) {
+        List<Message> messages = messageRepository.findConversation(user1Id, user2Id);
+        return messages.stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
     }
 
-    private void saveRoomMessage(ChatMessage chatMessage) {
-        String roomKey = "room_" + chatMessage.getRoomId();
-        roomMessages.computeIfAbsent(roomKey, k -> new ArrayList<>()).add(chatMessage);
+    public void markMessagesAsRead(Long receiverId, Long senderId) {
+        messageRepository.markMessagesAsRead(receiverId, senderId);
     }
 
-    public List<ChatMessage> getPrivateMessages(Long userId1, Long userId2) {
-        List<ChatMessage> allMessages = new ArrayList<>();
+    public Long getUnreadCount(Long userId) {
+        return messageRepository.countUnreadMessages(userId);
+    }
 
-        List<ChatMessage> user1Messages = userMessages.getOrDefault(userId1, new ArrayList<>());
-        List<ChatMessage> user2Messages = userMessages.getOrDefault(userId2, new ArrayList<>());
+    public Long getUnreadCountFromUser(Long receiverId, Long senderId) {
+        return messageRepository.countUnreadMessagesFromUser(receiverId, senderId);
+    }
 
-        for (ChatMessage msg : user1Messages) {
-            if ((msg.getSenderId().equals(userId1) && msg.getReceiverId().equals(userId2)) ||
-                    (msg.getSenderId().equals(userId2) && msg.getReceiverId().equals(userId1))) {
-                allMessages.add(msg);
-            }
+    public List<ChatMessage> getUnreadMessages(Long userId) {
+        User receiver = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        List<Message> messages = messageRepository.findByReceiverAndReadFalse(receiver);
+        return messages.stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
+
+    private ChatMessage convertToDto(Message message) {
+        ChatMessage dto = new ChatMessage();
+        dto.setId(message.getId());
+        dto.setContent(message.getContent());
+        dto.setSenderId(message.getSender().getId());
+        dto.setSenderName(message.getSender().getUsername());
+        dto.setReceiverId(message.getReceiver().getId());
+        dto.setTimestamp(message.getTimestamp());
+        dto.setRead(message.isRead());
+        dto.setType(ChatMessage.MessageType.valueOf(message.getType().name()));
+        dto.setSenderAvatar(getAvatarUrl(message.getSender()));
+        return dto;
+    }
+
+    private String getAvatarUrl(User user) {
+        if (user.getProfilePictureUrl() != null) {
+            return user.getProfilePictureUrl();
+        } else if (user.getProfilePictureFileName() != null) {
+            return "/api/users/profile-picture/" + user.getProfilePictureFileName();
         }
-
-        for (ChatMessage msg : user2Messages) {
-            if ((msg.getSenderId().equals(userId1) && msg.getReceiverId().equals(userId2)) ||
-                    (msg.getSenderId().equals(userId2) && msg.getReceiverId().equals(userId1))) {
-                if (!allMessages.contains(msg)) {
-                    allMessages.add(msg);
-                }
-            }
-        }
-
-        allMessages.sort((m1, m2) -> m1.getTimestamp().compareTo(m2.getTimestamp()));
-        return allMessages;
+        return null;
     }
 
-    public List<ChatMessage> getRoomMessages(Long roomId) {
-        String roomKey = "room_" + roomId;
-        return roomMessages.getOrDefault(roomKey, new ArrayList<>());
-    }
+    private void sendNotification(Long userId, String message) {
+        ChatMessage notification = new ChatMessage();
+        notification.setType(ChatMessage.MessageType.NOTIFICATION);
+        notification.setContent(message);
+        notification.setTimestamp(LocalDateTime.now());
 
-    public void markMessagesAsRead(Long senderId, Long receiverId) {
-        List<ChatMessage> messages = userMessages.getOrDefault(receiverId, new ArrayList<>());
-        for (ChatMessage msg : messages) {
-            if (msg.getSenderId().equals(senderId) && msg.getReceiverId().equals(receiverId)) {
-                msg.setRead(true);
-            }
-        }
-    }
-
-    public int getUnreadCount(Long userId, Long senderId) {
-        List<ChatMessage> messages = userMessages.getOrDefault(userId, new ArrayList<>());
-        int count = 0;
-        for (ChatMessage msg : messages) {
-            if (msg.getSenderId().equals(senderId) && msg.getReceiverId().equals(userId) && !msg.isRead()) {
-                count++;
-            }
-        }
-        return count;
+        messagingTemplate.convertAndSendToUser(
+                userId.toString(),
+                "/queue/notifications",
+                notification
+        );
     }
 }

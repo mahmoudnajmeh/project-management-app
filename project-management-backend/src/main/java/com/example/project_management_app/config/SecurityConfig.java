@@ -51,6 +51,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authz -> authz
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
+                        .requestMatchers("/api/chat/file/**").permitAll()
+                        .requestMatchers("/api/chat/download/**").permitAll()
+                        .requestMatchers("/api/chat/upload").authenticated()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/users/profile-picture/**").permitAll()
                         .requestMatchers("/ws/**").permitAll()

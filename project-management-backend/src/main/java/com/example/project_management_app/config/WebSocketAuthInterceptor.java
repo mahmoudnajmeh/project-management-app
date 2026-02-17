@@ -1,9 +1,10 @@
 package com.example.project_management_app.config;
 
-
 import com.example.project_management_app.entity.User;
 import com.example.project_management_app.repository.UserRepository;
 import com.example.project_management_app.util.JwtUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -21,6 +22,8 @@ import java.util.List;
 
 @Component
 public class WebSocketAuthInterceptor implements ChannelInterceptor {
+
+    private static final Logger logger = LoggerFactory.getLogger(WebSocketAuthInterceptor.class);
 
     @Autowired
     private JwtUtil jwtUtil;
@@ -43,18 +46,21 @@ public class WebSocketAuthInterceptor implements ChannelInterceptor {
 
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(
-                                    user.getId().toString(),
+                                    user,
                                     null,
                                     Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
                             );
 
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                     accessor.setUser(authentication);
+                    logger.debug("WebSocket authentication successful for user: {}", username);
 
                 } catch (Exception e) {
+                    logger.error("WebSocket authentication failed: {}", e.getMessage());
                     return null;
                 }
             } else {
+                logger.warn("WebSocket connection rejected: invalid or missing token");
                 return null;
             }
         }

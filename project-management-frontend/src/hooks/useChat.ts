@@ -3,10 +3,11 @@ import SockJS from 'sockjs-client';
 import { Client, IMessage } from '@stomp/stompjs';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
+import { chatApi } from '../api/chat';
 
 interface ChatMessage {
   id?: number;
-  type: 'CHAT' | 'JOIN' | 'LEAVE' | 'TYPING' | 'READ_RECEIPT';
+  type: 'CHAT' | 'JOIN' | 'LEAVE' | 'TYPING' | 'READ_RECEIPT' | 'NOTIFICATION' | 'TASK_CREATED' | 'TASK_UPDATED' | 'TASK_DELETED' | 'TASK_ASSIGNED' | 'TASK_COMPLETED' | 'PROJECT_CREATED' | 'PROJECT_UPDATED' | 'PROJECT_DELETED';
   content: string;
   senderId: number;
   senderName: string;
@@ -15,16 +16,17 @@ interface ChatMessage {
   roomId?: number;
   timestamp: string;
   read: boolean;
+  entityId?: number;
+  entityType?: string;
 }
 
 interface UseChatProps {
   receiverId?: number;
-  roomId?: number;
   onMessageReceived?: (message: ChatMessage) => void;
-  onTyping?: (isTyping: boolean, senderId: number) => void;
+  onNotification?: (notification: any) => void;
 }
 
-export const useChat = ({ receiverId, roomId, onMessageReceived, onTyping }: UseChatProps = {}) => {
+export const useChat = ({ receiverId, onMessageReceived, onNotification }: UseChatProps = {}) => {
   const { user } = useAuth();
   const { error } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -32,14 +34,49 @@ export const useChat = ({ receiverId, roomId, onMessageReceived, onTyping }: Use
   const [typingUsers, setTypingUsers] = useState<Set<number>>(new Set());
   const stompClient = useRef<Client | null>(null);
   const reconnectAttempts = useRef(0);
+  const isConnecting = useRef(false);
+  const hasLoadedInitialMessages = useRef(false);
+
+  const loadExistingMessages = useCallback(async () => {
+    if (!user || !receiverId || hasLoadedInitialMessages.current) return;
+
+    try {
+      const response = await chatApi.getConversation(user.id, receiverId);
+      const existingMessages = response.data.map((msg: any) => ({
+        id: msg.id,
+        type: msg.type,
+        content: msg.content,
+        senderId: msg.senderId,
+        senderName: msg.senderName,
+        senderAvatar: msg.senderAvatar,
+        receiverId: msg.receiverId,
+        timestamp: msg.timestamp,
+        read: msg.read,
+        entityId: msg.entityId,
+        entityType: msg.entityType
+      }));
+      
+      setMessages(existingMessages);
+      hasLoadedInitialMessages.current = true;
+    } catch (err) {
+      console.error('Error loading existing messages:', err);
+    }
+  }, [user, receiverId]);
+
+  useEffect(() => {
+    if (receiverId) {
+      hasLoadedInitialMessages.current = false;
+      loadExistingMessages();
+    }
+  }, [receiverId, loadExistingMessages]);
 
   const connect = useCallback(() => {
-    if (!user) {
-      console.error('No user found');
+    if (!user || !user.id) {
+      console.warn('No user or user ID found, skipping WebSocket connection');
       return;
     }
 
-    if (stompClient.current?.connected) {
+    if (stompClient.current?.connected || isConnecting.current) {
       return;
     }
 
@@ -48,6 +85,8 @@ export const useChat = ({ receiverId, roomId, onMessageReceived, onTyping }: Use
       console.error('No token found');
       return;
     }
+
+    isConnecting.current = true;
 
     const client = new Client({
       webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
@@ -58,23 +97,38 @@ export const useChat = ({ receiverId, roomId, onMessageReceived, onTyping }: Use
         Authorization: `Bearer ${token}`
       },
       debug: (str) => {
-        if (str.includes('error') || str.includes('ERROR')) {
+        if (str.includes('ERROR:') || str.includes('error:')) {
           console.error('STOMP Error:', str);
         }
       },
       onConnect: () => {
         setIsConnected(true);
         reconnectAttempts.current = 0;
+        isConnecting.current = false;
 
         client.subscribe('/user/queue/errors', (message: IMessage) => {
           console.error('WebSocket error:', message.body);
+        });
+
+        client.subscribe(`/user/${user.id}/queue/notifications`, (message: IMessage) => {
+          try {
+            const parsedMessage = JSON.parse(message.body);
+            console.log('WebSocket notification received in useChat:', parsedMessage);
+            
+            onNotification?.(parsedMessage);
+          } catch (e) {
+            console.error('Error parsing notification:', e);
+          }
         });
 
         if (receiverId) {
           client.subscribe(`/user/${user.id}/queue/messages`, (message: IMessage) => {
             try {
               const parsedMessage = JSON.parse(message.body);
-              handleMessage(parsedMessage);
+              if (parsedMessage.type === 'CHAT' && 
+                  (parsedMessage.senderId === receiverId || parsedMessage.receiverId === receiverId)) {
+                handleMessage(parsedMessage);
+              }
             } catch (e) {
               console.error('Error parsing message:', e);
             }
@@ -83,7 +137,9 @@ export const useChat = ({ receiverId, roomId, onMessageReceived, onTyping }: Use
           client.subscribe(`/user/${user.id}/queue/typing`, (message: IMessage) => {
             try {
               const parsedMessage = JSON.parse(message.body);
-              handleMessage(parsedMessage);
+              if (parsedMessage.type === 'TYPING' && parsedMessage.senderId === receiverId) {
+                handleMessage(parsedMessage);
+              }
             } catch (e) {
               console.error('Error parsing typing message:', e);
             }
@@ -92,44 +148,18 @@ export const useChat = ({ receiverId, roomId, onMessageReceived, onTyping }: Use
           client.subscribe(`/user/${user.id}/queue/read`, (message: IMessage) => {
             try {
               const parsedMessage = JSON.parse(message.body);
-              handleMessage(parsedMessage);
+              if (parsedMessage.type === 'READ_RECEIPT' && parsedMessage.senderId === receiverId) {
+                handleMessage(parsedMessage);
+              }
             } catch (e) {
               console.error('Error parsing read receipt:', e);
             }
           });
-        } else if (roomId) {
-          client.subscribe(`/topic/room/${roomId}`, (message: IMessage) => {
-            try {
-              const parsedMessage = JSON.parse(message.body);
-              handleMessage(parsedMessage);
-            } catch (e) {
-              console.error('Error parsing message:', e);
-            }
-          });
-        } else {
-          client.subscribe(`/topic/public`, (message: IMessage) => {
-            try {
-              const parsedMessage = JSON.parse(message.body);
-              handleMessage(parsedMessage);
-            } catch (e) {
-              console.error('Error parsing message:', e);
-            }
-          });
         }
-
-        const joinMessage: ChatMessage = {
-          type: 'JOIN',
-          content: `${user.username} joined the chat`,
-          senderId: user.id,
-          senderName: user.username,
-          timestamp: new Date().toISOString(),
-          read: true
-        };
-        
-        sendMessage(joinMessage);
       },
-      onStompError: (frame) => {
+      onStompError: () => {
         setIsConnected(false);
+        isConnecting.current = false;
         if (reconnectAttempts.current < 5) {
           reconnectAttempts.current += 1;
           setTimeout(connect, 5000);
@@ -137,28 +167,32 @@ export const useChat = ({ receiverId, roomId, onMessageReceived, onTyping }: Use
           error('Failed to connect to chat server');
         }
       },
-      onWebSocketError: (event) => {
+      onWebSocketError: () => {
         setIsConnected(false);
+        isConnecting.current = false;
       },
       onDisconnect: () => {
         setIsConnected(false);
+        isConnecting.current = false;
       }
     });
 
     stompClient.current = client;
     client.activate();
-  }, [user, receiverId, roomId, error]);
+  }, [user, receiverId, error, onNotification]);
 
   const disconnect = useCallback(() => {
     if (stompClient.current) {
       stompClient.current.deactivate();
       stompClient.current = null;
       setIsConnected(false);
+      isConnecting.current = false;
     }
   }, []);
 
-  const sendMessage = useCallback((message: Omit<ChatMessage, 'timestamp'>) => {
+  const sendMessage = useCallback(async (message: Omit<ChatMessage, 'timestamp'>) => {
     if (!stompClient.current?.connected || !user) {
+      console.warn('Cannot send message: WebSocket not connected or no user');
       return;
     }
 
@@ -169,6 +203,8 @@ export const useChat = ({ receiverId, roomId, onMessageReceived, onTyping }: Use
     };
 
     try {
+      setMessages(prev => [...prev, fullMessage]);
+      
       stompClient.current.publish({
         destination: '/app/chat.send',
         body: JSON.stringify(fullMessage),
@@ -176,17 +212,16 @@ export const useChat = ({ receiverId, roomId, onMessageReceived, onTyping }: Use
           'content-type': 'application/json'
         }
       });
-      
-      if (message.receiverId || message.roomId) {
-        setMessages(prev => [...prev, fullMessage]);
-      }
     } catch (err) {
       console.error('Error sending message:', err);
+      setMessages(prev => prev.filter(m => m !== fullMessage));
     }
   }, [user]);
 
   const sendTyping = useCallback(() => {
-    if (!stompClient.current?.connected || !user || !receiverId) return;
+    if (!stompClient.current?.connected || !user || !receiverId) {
+      return;
+    }
 
     const typingMessage: ChatMessage = {
       type: 'TYPING',
@@ -205,7 +240,9 @@ export const useChat = ({ receiverId, roomId, onMessageReceived, onTyping }: Use
   }, [user, receiverId]);
 
   const markAsRead = useCallback(() => {
-    if (!stompClient.current?.connected || !user || !receiverId) return;
+    if (!stompClient.current?.connected || !user || !receiverId) {
+      return;
+    }
 
     const readMessage: ChatMessage = {
       type: 'READ_RECEIPT',
@@ -221,35 +258,55 @@ export const useChat = ({ receiverId, roomId, onMessageReceived, onTyping }: Use
       destination: '/app/chat.read',
       body: JSON.stringify(readMessage)
     });
+
+    if (receiverId) {
+      chatApi.markAsRead(user.id, receiverId).catch(console.error);
+    }
   }, [user, receiverId]);
 
   const handleMessage = useCallback((message: ChatMessage) => {
     if (message.type === 'TYPING') {
-      setTypingUsers(prev => new Set([...prev, message.senderId]));
-      setTimeout(() => {
+      setTypingUsers(prev => {
+        const newSet = new Set(prev);
+        newSet.add(message.senderId);
+        return newSet;
+      });
+      
+      const typingTimer = setTimeout(() => {
         setTypingUsers(prev => {
           const newSet = new Set(prev);
           newSet.delete(message.senderId);
           return newSet;
         });
       }, 3000);
-      onTyping?.(true, message.senderId);
+      
+      return () => clearTimeout(typingTimer);
     } else if (message.type === 'READ_RECEIPT') {
       setMessages(prev => prev.map(m => 
         m.senderId === message.senderId && m.receiverId === user?.id 
           ? { ...m, read: true }
           : m
       ));
-    } else {
-      setMessages(prev => [...prev, message]);
+    } else if (message.type === 'CHAT') {
+      setMessages(prev => {
+        const exists = prev.some(m => 
+          m.id === message.id || 
+          (m.senderId === message.senderId && 
+           m.receiverId === message.receiverId && 
+           m.content === message.content && 
+           Math.abs(new Date(m.timestamp).getTime() - new Date(message.timestamp).getTime()) < 1000)
+        );
+        return exists ? prev : [...prev, message];
+      });
       onMessageReceived?.(message);
     }
-  }, [user, onMessageReceived, onTyping]);
+  }, [user, onMessageReceived]);
 
   useEffect(() => {
-    if (user) {
+    if (user && user.id) {
       connect();
     }
+    
     return () => {
       disconnect();
     };
@@ -262,6 +319,7 @@ export const useChat = ({ receiverId, roomId, onMessageReceived, onTyping }: Use
     markAsRead,
     isConnected,
     typingUsers: Array.from(typingUsers),
+    loadExistingMessages,
     connect,
     disconnect
   };

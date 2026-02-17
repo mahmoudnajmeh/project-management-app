@@ -18,6 +18,11 @@ import { useToast } from '../../hooks/useToast';
 import Button from '../common/Button';
 import Modal from '../common/Modal';
 import ProjectForm from '../projects/ProjectForm';
+import io from 'socket.io-client';
+
+const socket = io('http://localhost:8080', {
+  withCredentials: true
+});
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -37,6 +42,7 @@ interface TeamMember {
   lastActivity: string;
   createdAt: string;
   updatedAt: string;
+  isOnline?: boolean;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
@@ -59,6 +65,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
 
   useEffect(() => {
     fetchTeamMembers();
+
+    socket.on('user_status_change', handleUserStatusChange);
+    socket.on('user_last_activity', handleUserLastActivity);
+
+    return () => {
+      socket.off('user_status_change', handleUserStatusChange);
+      socket.off('user_last_activity', handleUserLastActivity);
+    };
   }, []);
 
   const fetchTeamMembers = async () => {
@@ -69,6 +83,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
         ...user,
         profilePictureFileName: user.profilePictureFileName ?? undefined,
         lastActivity: user.lastActivity || user.updatedAt,
+        isOnline: calculateOnlineStatus(user.lastActivity || user.updatedAt)
       }));
       
       setTeamMembers(transformedData);
@@ -77,6 +92,42 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
     } finally {
       setIsLoadingMembers(false);
     }
+  };
+
+  const calculateOnlineStatus = (lastActivity: string) => {
+    if (!lastActivity) return false;
+    
+    const lastActive = new Date(lastActivity);
+    const now = new Date();
+    const diffInMinutes = Math.floor((now.getTime() - lastActive.getTime()) / (1000 * 60));
+    
+    return diffInMinutes < 5;
+  };
+
+  const handleUserStatusChange = (data: { userId: number; isOnline: boolean; lastActivity: string }) => {
+    setTeamMembers(prev => prev.map(member => {
+      if (member.id === data.userId) {
+        return {
+          ...member,
+          isOnline: data.isOnline,
+          lastActivity: data.lastActivity
+        };
+      }
+      return member;
+    }));
+  };
+
+  const handleUserLastActivity = (data: { userId: number; lastActivity: string }) => {
+    setTeamMembers(prev => prev.map(member => {
+      if (member.id === data.userId) {
+        return {
+          ...member,
+          lastActivity: data.lastActivity,
+          isOnline: calculateOnlineStatus(data.lastActivity)
+        };
+      }
+      return member;
+    }));
   };
 
   const getInitials = (firstName: string = '', lastName: string = '') => {
@@ -116,13 +167,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
   };
 
   const getUserStatus = (member: TeamMember) => {
-    if (!member.lastActivity) return false;
-    
-    const lastActive = new Date(member.lastActivity);
-    const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - lastActive.getTime()) / (1000 * 60));
-    
-    return diffInMinutes < 15;
+    return member.isOnline || false;
   };
 
   const getLastActiveTime = (member: TeamMember) => {
@@ -191,9 +236,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
       .slice(0, 5);
   };
 
+  const getAllTeamMembersSorted = () => {
+    return [...teamMembers]
+      .sort((a, b) => {
+        if (getUserStatus(a) && !getUserStatus(b)) return -1;
+        if (!getUserStatus(a) && getUserStatus(b)) return 1;
+        return new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime();
+      })
+      .slice(0, 5);
+  };
+
   return (
     <>
-      {/* Mobile overlay */}
       {isOpen && onClose && (
         <div
           className="fixed inset-0 z-30 bg-black bg-opacity-50 lg:hidden"
@@ -208,7 +262,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
         )}
       >
         <div className="h-full px-3 py-4">
-          {/* Quick Actions */}
           <div className="mb-6">
             <Button
               onClick={handleNewProjectClick}
@@ -219,7 +272,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
             </Button>
           </div>
 
-          {/* Navigation */}
           <nav>
             <div className="mb-4">
               <h3 className="px-3 mb-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -248,7 +300,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
               </ul>
             </div>
 
-            {/* Recent Projects */}
             <div className="mb-4">
               <div className="flex items-center justify-between px-3 mb-2">
                 <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -295,14 +346,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
               </ul>
             </div>
 
-            {/* Online Team Members */}
             <div>
               <div className="flex items-center justify-between px-3 mb-2">
                 <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Online Members
+                  Team Members
                 </h3>
                 <span className="text-xs text-gray-400">
-                  {isLoadingMembers ? '...' : getOnlineTeamMembers().length}
+                  {isLoadingMembers ? '...' : `${getOnlineTeamMembers().length}/${teamMembers.length}`}
                 </span>
               </div>
               <div className="px-3">
@@ -319,12 +369,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
                         </div>
                       ))}
                     </div>
-                  ) : getOnlineTeamMembers().length === 0 ? (
+                  ) : teamMembers.length === 0 ? (
                     <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-2">
-                      No online members
+                      No team members
                     </p>
                   ) : (
-                    getOnlineTeamMembers().map((member) => {
+                    getAllTeamMembersSorted().map((member) => {
                       const profilePictureUrl = getProfilePictureUrl(member);
                       const isOnline = getUserStatus(member);
                       const lastActive = getLastActiveTime(member);
@@ -387,7 +437,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen = true, onClose }) => {
         </div>
       </aside>
 
-      {/* New Project Modal */}
       <Modal
         isOpen={isNewProjectModalOpen}
         onClose={() => setIsNewProjectModalOpen(false)}

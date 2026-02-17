@@ -25,6 +25,12 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
             "WHERE t.project = :project")
     List<Task> findByProject(@Param("project") Project project);
 
+    @Query("SELECT DISTINCT t FROM Task t " +
+            "LEFT JOIN FETCH t.project p " +
+            "LEFT JOIN FETCH t.assignedUser " +
+            "WHERE p.team IN :teams")
+    List<Task> findByProjectTeamIn(@Param("teams") List<com.example.project_management_app.entity.Team> teams);
+
     @Override
     @Query("SELECT DISTINCT t FROM Task t " +
             "LEFT JOIN FETCH t.project " +

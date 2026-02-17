@@ -3,6 +3,7 @@ package com.example.project_management_app.dto;
 import com.example.project_management_app.entity.User;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 
 public class UserDto {
     private Long id;
@@ -15,13 +16,13 @@ public class UserDto {
     private String email;
 
     @NotBlank
+    @Pattern(regexp = "^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=!])(?=\\S+$).{8,}$", message = "Password must be at least 8 characters long and contain at least one digit, one uppercase letter, one lowercase letter, and one special character")
     private String password;
 
     private String firstName;
     private String lastName;
     private User.Role role;
 
-    // Constructors, Getters, and Setters
     public UserDto() {}
 
     public UserDto(String username, String email, String password, String firstName, String lastName) {

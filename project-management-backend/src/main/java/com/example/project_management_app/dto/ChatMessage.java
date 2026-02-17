@@ -19,7 +19,8 @@ public class ChatMessage {
         JOIN,
         LEAVE,
         TYPING,
-        READ_RECEIPT
+        READ_RECEIPT,
+        NOTIFICATION
     }
 
     public ChatMessage() {

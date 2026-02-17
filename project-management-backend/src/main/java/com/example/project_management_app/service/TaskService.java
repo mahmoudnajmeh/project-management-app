@@ -3,6 +3,7 @@ package com.example.project_management_app.service;
 
 import com.example.project_management_app.dto.TaskDto;
 import com.example.project_management_app.entity.Task;
+import com.example.project_management_app.entity.User;
 
 import java.util.List;
 
@@ -14,4 +15,5 @@ public interface TaskService {
     List<Task> getAllTasks();
     List<Task> getTasksByProject(Long projectId);
     List<Task> getTasksByUser();
+    List<Task> getTasksByAssignedUser(User user);
 }

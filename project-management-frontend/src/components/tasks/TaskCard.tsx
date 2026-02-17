@@ -3,6 +3,7 @@ import { Calendar, User, AlertCircle, MoreVertical, CheckCircle, Clock, Trash2 }
 import type { Task } from '../../types/task';
 import { useTasks } from '../../hooks/useTasks';
 import { useToast } from '../../hooks/useToast';
+import { useAuth } from '../../hooks/useAuth';
 import Card from '../common/Card';
 import Modal from '../common/Modal';
 import Button from '../common/Button';
@@ -14,6 +15,7 @@ interface TaskCardProps {
 const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
   const { updateTask, deleteTask } = useTasks();
   const { success, error } = useToast();
+  const { user } = useAuth();
   const [showActions, setShowActions] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] = useState(false);
@@ -39,17 +41,58 @@ const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
     }
   };
 
+  // Check if current user can modify this task (edit details, delete, etc.)
+  const canModifyTask = () => {
+    if (!user) return false;
+    
+    // Only task assignee can modify their own tasks
+    if (task.assignedUser && task.assignedUser.id === user.id) {
+      return true;
+    }
+    
+    // Note: Project creator permissions should be handled in backend
+    // Frontend hides buttons, backend validates
+    
+    return false;
+  };
+
+  // Check if current user can update task status
+  const canUpdateStatus = () => {
+    if (!user) return false;
+    
+    // Only task assignee can update their own task status
+    if (task.assignedUser && task.assignedUser.id === user.id) {
+      return true;
+    }
+    
+    // No one else can update task status
+    return false;
+  };
+
   const handleStatusChange = async (newStatus: string) => {
+    if (!canUpdateStatus()) {
+      error('You are not authorized to update this task');
+      return;
+    }
+    
     try {
       await updateTask({ id: task.id, data: { status: newStatus as any } });
       success('Task status updated');
       setShowActions(false);
-    } catch (error) {
-      console.error('Failed to update task status:', error);
+    } catch (err: any) {
+      if (err.response?.status === 403) {
+        error('You are not authorized to update this task');
+      } else {
+        error('Failed to update task status');
+      }
     }
   };
 
   const handleDeleteConfirm = () => {
+    if (!canModifyTask()) {
+      error('You are not authorized to delete this task');
+      return;
+    }
     setIsConfirmDeleteModalOpen(true);
     setShowActions(false);
   };
@@ -61,7 +104,11 @@ const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
       success('Task deleted successfully');
       setIsConfirmDeleteModalOpen(false);
     } catch (err: any) {
-      error(err.message || 'Failed to delete task');
+      if (err.response?.status === 403) {
+        error('You are not authorized to delete this task');
+      } else {
+        error(err.message || 'Failed to delete task');
+      }
     } finally {
       setIsDeleting(false);
     }
@@ -92,6 +139,8 @@ const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
   const handleMenuItemClick = (action: () => void) => {
     action();
   };
+
+  const isCurrentUserAssigned = user && task.assignedUser && task.assignedUser.id === user.id;
 
   return (
     <>
@@ -128,61 +177,68 @@ const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
                 </div>
                 <div className="flex items-center text-gray-500 dark:text-gray-400">
                   <User className="h-4 w-4 mr-1" />
-                  <span>{task.assignedUser.firstName} {task.assignedUser.lastName}</span>
+                  <span>
+                    {task.assignedUser.firstName} {task.assignedUser.lastName}
+                    {isCurrentUserAssigned && (
+                      <span className="ml-1 text-xs text-primary-600 dark:text-primary-400">(You)</span>
+                    )}
+                  </span>
                 </div>
               </div>
               <div className="flex items-center space-x-2">
                 <span className="text-primary-600 dark:text-primary-400 font-medium">
                   {task.project.name}
                 </span>
-                <div className="relative" ref={actionsRef}>
-                  <button
-                    onClick={() => setShowActions(!showActions)}
-                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                  >
-                    <MoreVertical className="h-4 w-4 text-gray-500" />
-                  </button>
-                  {showActions && (
-                    <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-10">
-                      <div className="py-1">
-                        <div className="border-t border-gray-200 dark:border-gray-700">
-                          <button
-                            onClick={() => handleMenuItemClick(() => handleStatusChange('TODO'))}
-                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                          >
-                            Mark as To Do
-                          </button>
-                          <button
-                            onClick={() => handleMenuItemClick(() => handleStatusChange('IN_PROGRESS'))}
-                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                          >
-                            Mark as In Progress
-                          </button>
-                          <button
-                            onClick={() => handleMenuItemClick(() => handleStatusChange('DONE'))}
-                            className="block w-full text-left px-4 py-2 text-sm text-green-600 dark:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                          >
-                            Mark as Done
-                          </button>
-                        </div>
-                        <div className="border-t border-gray-200 dark:border-gray-700">
-                          <button
-                            onClick={handleDeleteConfirm}
-                            className="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                          >
-                            Delete Task
-                          </button>
+                {canModifyTask() && (
+                  <div className="relative" ref={actionsRef}>
+                    <button
+                      onClick={() => setShowActions(!showActions)}
+                      className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                    >
+                      <MoreVertical className="h-4 w-4 text-gray-500" />
+                    </button>
+                    {showActions && (
+                      <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-10">
+                        <div className="py-1">
+                          <div className="border-t border-gray-200 dark:border-gray-700">
+                            <button
+                              onClick={() => handleMenuItemClick(() => handleStatusChange('TODO'))}
+                              className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                            >
+                              Mark as To Do
+                            </button>
+                            <button
+                              onClick={() => handleMenuItemClick(() => handleStatusChange('IN_PROGRESS'))}
+                              className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                            >
+                              Mark as In Progress
+                            </button>
+                            <button
+                              onClick={() => handleMenuItemClick(() => handleStatusChange('DONE'))}
+                              className="block w-full text-left px-4 py-2 text-sm text-green-600 dark:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                            >
+                              Mark as Done
+                            </button>
+                          </div>
+                          <div className="border-t border-gray-200 dark:border-gray-700">
+                            <button
+                              onClick={handleDeleteConfirm}
+                              className="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                            >
+                              Delete Task
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
 
-        {task.status !== 'DONE' && (
+        {task.status !== 'DONE' && canUpdateStatus() && (
           <div className="flex items-center space-x-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
             <button
               onClick={() => handleStatusChange('IN_PROGRESS')}

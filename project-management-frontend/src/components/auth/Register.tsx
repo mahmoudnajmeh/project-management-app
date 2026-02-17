@@ -2,7 +2,7 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { UserPlus, User, Mail, Lock, Hash } from 'lucide-react';
+import { UserPlus, User, Mail, Lock, Hash, Eye, EyeOff } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
@@ -10,10 +10,17 @@ import Input from '../common/Input';
 import Button from '../common/Button';
 import Card, { CardHeader, CardContent, CardFooter } from '../common/Card';
 
+const passwordSchema = z.string()
+  .min(8, 'Password must be at least 8 characters')
+  .regex(/[0-9]/, 'Password must contain at least one number')
+  .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+  .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+  .regex(/[^a-zA-Z0-9]/, 'Password must contain at least one special character');
+
 const registerSchema = z.object({
   username: z.string().min(3, 'Username must be at least 3 characters'),
   email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: passwordSchema,
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
 });
@@ -24,14 +31,46 @@ const Register: React.FC = () => {
   const { register: registerUser } = useAuth();
   const { success, error } = useToast();
   const navigate = useNavigate();
+  const [showPassword, setShowPassword] = React.useState(false);
   
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
+    watch,
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
   });
+
+  const password = watch('password', '');
+
+  const getPasswordStrength = () => {
+    let strength = 0;
+    if (password.length >= 8) strength++;
+    if (/[0-9]/.test(password)) strength++;
+    if (/[a-z]/.test(password)) strength++;
+    if (/[A-Z]/.test(password)) strength++;
+    if (/[^a-zA-Z0-9]/.test(password)) strength++;
+    return strength;
+  };
+
+  const passwordStrength = getPasswordStrength();
+  const strengthPercentage = (passwordStrength / 5) * 100;
+
+  const getStrengthColor = () => {
+    if (passwordStrength <= 2) return 'bg-red-500';
+    if (passwordStrength <= 3) return 'bg-yellow-500';
+    if (passwordStrength <= 4) return 'bg-blue-500';
+    return 'bg-green-500';
+  };
+
+  const getStrengthText = () => {
+    if (password.length === 0) return '';
+    if (passwordStrength <= 2) return 'Weak';
+    if (passwordStrength <= 3) return 'Fair';
+    if (passwordStrength <= 4) return 'Good';
+    return 'Strong';
+  };
 
   const onSubmit = async (data: RegisterFormData) => {
     try {
@@ -95,15 +134,63 @@ const Register: React.FC = () => {
                 leftIcon={<Mail className="h-4 w-4 text-gray-400" />}
                 error={errors.email?.message}
               />
-              <Input
-                {...register('password')}
-                type="password"
-                label="Password"
-                placeholder="Create a password"
-                leftIcon={<Lock className="h-4 w-4 text-gray-400" />}
-                error={errors.password?.message}
-                helperText="Must be at least 6 characters"
-              />
+              <div className="space-y-2">
+                <Input
+                  {...register('password')}
+                  type={showPassword ? 'text' : 'password'}
+                  label="Password"
+                  placeholder="Create a password"
+                  leftIcon={<Lock className="h-4 w-4 text-gray-400" />}
+                  rightIcon={
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="focus:outline-none"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-gray-400" />
+                      )}
+                    </button>
+                  }
+                  error={errors.password?.message}
+                />
+                
+                {password && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full ${getStrengthColor()} transition-all duration-300`}
+                          style={{ width: `${strengthPercentage}%` }}
+                        />
+                      </div>
+                      <span className="ml-2 text-xs font-medium text-gray-600 dark:text-gray-400">
+                        {getStrengthText()}
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className={`flex items-center ${password.length >= 8 ? 'text-green-600' : 'text-gray-500'}`}>
+                        <span className="mr-1">✓</span> 8+ characters
+                      </div>
+                      <div className={`flex items-center ${/[0-9]/.test(password) ? 'text-green-600' : 'text-gray-500'}`}>
+                        <span className="mr-1">✓</span> Number
+                      </div>
+                      <div className={`flex items-center ${/[a-z]/.test(password) ? 'text-green-600' : 'text-gray-500'}`}>
+                        <span className="mr-1">✓</span> Lowercase
+                      </div>
+                      <div className={`flex items-center ${/[A-Z]/.test(password) ? 'text-green-600' : 'text-gray-500'}`}>
+                        <span className="mr-1">✓</span> Uppercase
+                      </div>
+                      <div className={`flex items-center ${/[^a-zA-Z0-9]/.test(password) ? 'text-green-600' : 'text-gray-500'}`}>
+                        <span className="mr-1">✓</span> Special char
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </CardContent>
             <CardFooter>
               <Button

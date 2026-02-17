@@ -35,6 +35,10 @@ public class Project {
     @JoinColumn(name = "created_by")
     private User createdBy;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "team_id")
+    private Team team;
+
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonIgnore
     private List<Task> tasks;
@@ -55,10 +59,11 @@ public class Project {
 
     public Project() {}
 
-    public Project(String name, String description, User createdBy) {
+    public Project(String name, String description, User createdBy, Team team) {
         this.name = name;
         this.description = description;
         this.createdBy = createdBy;
+        this.team = team;
     }
 
     public Long getId() { return id; }
@@ -97,6 +102,9 @@ public class Project {
     @JsonIgnore
     public User getCreatedBy() { return createdBy; }
     public void setCreatedBy(User createdBy) { this.createdBy = createdBy; }
+
+    public Team getTeam() { return team; }
+    public void setTeam(Team team) { this.team = team; }
 
     public List<Task> getTasks() { return tasks; }
     public void setTasks(List<Task> tasks) { this.tasks = tasks; }

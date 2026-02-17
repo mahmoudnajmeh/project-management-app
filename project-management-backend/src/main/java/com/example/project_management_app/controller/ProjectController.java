@@ -9,13 +9,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/projects")
@@ -33,13 +29,22 @@ public class ProjectController {
     public ResponseEntity<?> getProject(@PathVariable Long id) {
         try {
             Project project = projectService.getProjectById(id);
-
-            // Check if user has access to this project
             User currentUser = accountService.getCurrentUser();
-            if (!project.getCreatedBy().getId().equals(currentUser.getId())) {
+
+            boolean isCreator = project.getCreatedBy().getId().equals(currentUser.getId());
+
+            boolean isAssignedToTasks = project.getTasks().stream()
+                    .anyMatch(task -> task.getAssignedUser() != null &&
+                            task.getAssignedUser().getId().equals(currentUser.getId()));
+
+            boolean hasAccess = isCreator || isAssignedToTasks;
+
+            if (!hasAccess) {
+                logger.warn("Access denied for user {} to project {}", currentUser.getId(), id);
                 return ResponseEntity.status(403).body("Access denied");
             }
 
+            logger.info("User {} accessed project {}", currentUser.getId(), id);
             return ResponseEntity.ok(project);
         } catch (RuntimeException e) {
             if (e.getMessage().contains("not found")) {

@@ -2,14 +2,21 @@ package com.example.project_management_app.service;
 
 import com.example.project_management_app.dto.CalendarEventDto;
 import com.example.project_management_app.entity.CalendarEvent;
+import com.example.project_management_app.entity.Project;
+import com.example.project_management_app.entity.Team;
 import com.example.project_management_app.entity.User;
 import com.example.project_management_app.repository.CalendarEventRepository;
+import com.example.project_management_app.repository.ProjectRepository;
+import com.example.project_management_app.repository.TeamRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @Transactional
@@ -19,7 +26,19 @@ public class CalendarEventServiceImpl implements CalendarEventService {
     private CalendarEventRepository calendarEventRepository;
 
     @Autowired
+    private ProjectRepository projectRepository;
+
+    @Autowired
+    private TeamRepository teamRepository;
+
+    @Autowired
     private AccountService accountService;
+
+    @Autowired
+    private UserService userService;
+
+    @Autowired
+    private NotificationService notificationService;
 
     @Override
     public CalendarEvent createEvent(CalendarEventDto eventDto) {
@@ -49,7 +68,22 @@ public class CalendarEventServiceImpl implements CalendarEventService {
             event.setColor(getEventColor(event.getType(), event.getPriority()));
         }
 
-        return calendarEventRepository.save(event);
+        CalendarEvent savedEvent = calendarEventRepository.save(event);
+
+        List<User> teamMembers = userService.getUsersInSameTeam(currentUser);
+
+        String notificationContent = currentUser.getFirstName() + " created calendar event: " + event.getTitle();
+        notificationService.createNotificationForUsers(
+                teamMembers,
+                notificationContent,
+                "CALENDAR_EVENT_CREATED",
+                savedEvent.getId(),
+                "CALENDAR_EVENT",
+                currentUser.getId(),
+                currentUser.getFirstName() + " " + currentUser.getLastName()
+        );
+
+        return savedEvent;
     }
 
     @Override
@@ -57,8 +91,9 @@ public class CalendarEventServiceImpl implements CalendarEventService {
         CalendarEvent event = getEventById(id);
         User currentUser = accountService.getCurrentUser();
 
-        if (!event.getCreatedBy().equals(currentUser.getId())) {
-            throw new RuntimeException("You can only update your own events");
+        if (!event.getCreatedBy().equals(currentUser.getId()) &&
+                (event.getAssignedUserId() == null || !event.getAssignedUserId().equals(currentUser.getId()))) {
+            throw new RuntimeException("You can only update your own events or events assigned to you");
         }
 
         if (eventDto.getTitle() != null) {
@@ -95,7 +130,22 @@ public class CalendarEventServiceImpl implements CalendarEventService {
             event.setAssignedUserId(eventDto.getAssignedUserId());
         }
 
-        return calendarEventRepository.save(event);
+        CalendarEvent updatedEvent = calendarEventRepository.save(event);
+
+        List<User> teamMembers = userService.getUsersInSameTeam(currentUser);
+
+        String notificationContent = currentUser.getFirstName() + " updated calendar event: " + event.getTitle();
+        notificationService.createNotificationForUsers(
+                teamMembers,
+                notificationContent,
+                "CALENDAR_EVENT_UPDATED",
+                event.getId(),
+                "CALENDAR_EVENT",
+                currentUser.getId(),
+                currentUser.getFirstName() + " " + currentUser.getLastName()
+        );
+
+        return updatedEvent;
     }
 
     @Override
@@ -103,9 +153,23 @@ public class CalendarEventServiceImpl implements CalendarEventService {
         CalendarEvent event = getEventById(id);
         User currentUser = accountService.getCurrentUser();
 
-        if (!event.getCreatedBy().equals(currentUser.getId())) {
-            throw new RuntimeException("You can only delete your own events");
+        if (!event.getCreatedBy().equals(currentUser.getId()) &&
+                (event.getAssignedUserId() == null || !event.getAssignedUserId().equals(currentUser.getId()))) {
+            throw new RuntimeException("You can only delete your own events or events assigned to you");
         }
+
+        List<User> teamMembers = userService.getUsersInSameTeam(currentUser);
+
+        String notificationContent = currentUser.getFirstName() + " deleted calendar event: " + event.getTitle();
+        notificationService.createNotificationForUsers(
+                teamMembers,
+                notificationContent,
+                "CALENDAR_EVENT_DELETED",
+                event.getId(),
+                "CALENDAR_EVENT",
+                currentUser.getId(),
+                currentUser.getFirstName() + " " + currentUser.getLastName()
+        );
 
         calendarEventRepository.deleteById(id);
     }
@@ -124,19 +188,76 @@ public class CalendarEventServiceImpl implements CalendarEventService {
     @Override
     public List<CalendarEvent> getUserEvents() {
         User currentUser = accountService.getCurrentUser();
-        return calendarEventRepository.findByCreatedBy(currentUser.getId());
+        List<CalendarEvent> userEvents = calendarEventRepository.findByCreatedBy(currentUser.getId());
+
+        List<Team> userTeams = teamRepository.findByMemberId(currentUser.getId());
+        List<CalendarEvent> teamEvents = new ArrayList<>();
+
+        for (Team team : userTeams) {
+            List<Project> teamProjects = projectRepository.findByTeam(team);
+            for (Project project : teamProjects) {
+                List<CalendarEvent> projectEvents = calendarEventRepository.findByProjectId(project.getId());
+                teamEvents.addAll(projectEvents);
+            }
+        }
+
+        Set<CalendarEvent> allEvents = new HashSet<>(userEvents);
+        allEvents.addAll(teamEvents);
+
+        return new ArrayList<>(allEvents);
     }
 
     @Override
     public List<CalendarEvent> getEventsBetween(LocalDateTime start, LocalDateTime end) {
         User currentUser = accountService.getCurrentUser();
-        return calendarEventRepository.findEventsBetweenDates(currentUser.getId(), start, end);
+        List<CalendarEvent> userEvents = calendarEventRepository.findEventsBetweenDates(currentUser.getId(), start, end);
+
+        List<Team> userTeams = teamRepository.findByMemberId(currentUser.getId());
+        List<CalendarEvent> teamEvents = new ArrayList<>();
+
+        for (Team team : userTeams) {
+            List<Project> teamProjects = projectRepository.findByTeam(team);
+            for (Project project : teamProjects) {
+                List<CalendarEvent> projectEvents = calendarEventRepository.findByProjectId(project.getId());
+                for (CalendarEvent event : projectEvents) {
+                    if ((event.getEventDate().isAfter(start) || event.getEventDate().isEqual(start)) &&
+                            (event.getEventDate().isBefore(end) || event.getEventDate().isEqual(end))) {
+                        teamEvents.add(event);
+                    }
+                }
+            }
+        }
+
+        Set<CalendarEvent> allEvents = new HashSet<>(userEvents);
+        allEvents.addAll(teamEvents);
+
+        return new ArrayList<>(allEvents);
     }
 
     @Override
     public List<CalendarEvent> getEventsByType(String type) {
         User currentUser = accountService.getCurrentUser();
-        return calendarEventRepository.findByType(currentUser.getId(), type);
+        List<CalendarEvent> userEvents = calendarEventRepository.findByType(currentUser.getId(), type);
+
+        List<Team> userTeams = teamRepository.findByMemberId(currentUser.getId());
+        List<CalendarEvent> teamEvents = new ArrayList<>();
+
+        for (Team team : userTeams) {
+            List<Project> teamProjects = projectRepository.findByTeam(team);
+            for (Project project : teamProjects) {
+                List<CalendarEvent> projectEvents = calendarEventRepository.findByProjectId(project.getId());
+                for (CalendarEvent event : projectEvents) {
+                    if (event.getType().equals(type)) {
+                        teamEvents.add(event);
+                    }
+                }
+            }
+        }
+
+        Set<CalendarEvent> allEvents = new HashSet<>(userEvents);
+        allEvents.addAll(teamEvents);
+
+        return new ArrayList<>(allEvents);
     }
 
     @Override

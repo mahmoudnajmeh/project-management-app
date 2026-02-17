@@ -68,30 +68,30 @@ const Calendar: React.FC = () => {
   });
 
   const loadCalendarEvents = async () => {
-    try {
-      const response = await api.get('/calendar/my-events');
-      const calendarEvents = response.data.map((event: any) => ({
-        id: event.id,
-        title: event.title,
-        description: event.description,
-        date: new Date(event.eventDate),
-        eventDate: event.eventDate,
-        type: event.type,
-        priority: event.priority,
-        status: event.status,
-        color: event.color || getEventColor(event.type, event.priority),
-        allDay: event.allDay || false,
-        projectId: event.projectId,
-        assignedUserId: event.assignedUserId,
-        createdBy: event.createdBy,
-        ...(event.endDate && { endDate: new Date(event.endDate) }),
-      }));
-      return calendarEvents;
-    } catch (err) {
-      console.error('Error loading calendar events:', err);
-      return [];
-    }
-  };
+  try {
+    const response = await api.get('/calendar');
+    const calendarEvents = response.data.map((event: any) => ({
+      id: event.id,
+      title: event.title,
+      description: event.description,
+      date: new Date(event.eventDate),
+      eventDate: event.eventDate,
+      type: event.type,
+      priority: event.priority,
+      status: event.status,
+      color: event.color || getEventColor(event.type, event.priority),
+      allDay: event.allDay || false,
+      projectId: event.projectId,
+      assignedUserId: event.assignedUserId,
+      createdBy: event.createdBy,
+      ...(event.endDate && { endDate: new Date(event.endDate) }),
+    }));
+    return calendarEvents;
+  } catch (err) {
+    console.error('Error loading calendar events:', err);
+    return [];
+  }
+};
 
   useEffect(() => {
     const fetchEvents = async () => {

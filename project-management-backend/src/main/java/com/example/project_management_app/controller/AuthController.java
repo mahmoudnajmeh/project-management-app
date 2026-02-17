@@ -9,9 +9,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -26,7 +30,25 @@ public class AuthController {
     private EmailService emailService;
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody UserDto userDto) {
+    public ResponseEntity<?> register(@Valid @RequestBody UserDto userDto, BindingResult bindingResult) {
+        // Handle validation errors
+        if (bindingResult.hasErrors()) {
+            Map<String, String> errors = new HashMap<>();
+            for (FieldError error : bindingResult.getFieldErrors()) {
+                errors.put(error.getField(), error.getDefaultMessage());
+            }
+
+            String errorMessage = errors.values().stream()
+                    .collect(Collectors.joining(", "));
+
+            logger.error("Validation errors: {}", errors);
+
+            Map<String, String> response = new HashMap<>();
+            response.put("error", errorMessage);
+            response.put("validationErrors", errors.toString());
+            return ResponseEntity.badRequest().body(response);
+        }
+
         try {
             logger.info("Registering user: {}", userDto.getUsername());
             User user = accountService.registerUser(userDto);
@@ -41,7 +63,26 @@ public class AuthController {
     }
 
     @PostMapping("/register-with-token")
-    public ResponseEntity<?> registerWithToken(@RequestBody UserDto userDto, @RequestParam String token) {
+    public ResponseEntity<?> registerWithToken(@Valid @RequestBody UserDto userDto,
+                                               @RequestParam String token,
+                                               BindingResult bindingResult) {
+        // Handle validation errors
+        if (bindingResult.hasErrors()) {
+            Map<String, String> errors = new HashMap<>();
+            for (FieldError error : bindingResult.getFieldErrors()) {
+                errors.put(error.getField(), error.getDefaultMessage());
+            }
+
+            String errorMessage = errors.values().stream()
+                    .collect(Collectors.joining(", "));
+
+            logger.error("Validation errors: {}", errors);
+
+            Map<String, String> response = new HashMap<>();
+            response.put("error", errorMessage);
+            return ResponseEntity.badRequest().body(response);
+        }
+
         try {
             if (!emailService.validateInvitationToken(token)) {
                 Map<String, String> response = new HashMap<>();
@@ -70,7 +111,24 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest, BindingResult bindingResult) {
+        // Handle validation errors
+        if (bindingResult.hasErrors()) {
+            Map<String, String> errors = new HashMap<>();
+            for (FieldError error : bindingResult.getFieldErrors()) {
+                errors.put(error.getField(), error.getDefaultMessage());
+            }
+
+            String errorMessage = errors.values().stream()
+                    .collect(Collectors.joining(", "));
+
+            logger.error("Login validation errors: {}", errors);
+
+            Map<String, String> response = new HashMap<>();
+            response.put("error", errorMessage);
+            return ResponseEntity.badRequest().body(response);
+        }
+
         try {
             logger.info("Login attempt for user: {}", loginRequest.getUsername());
             String token = accountService.loginUser(loginRequest);
