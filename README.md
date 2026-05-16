@@ -20,62 +20,15 @@ A full-stack project management application built with **Spring Boot 3.2.0** and
 
 # 🏗️ Project Architecture
 
-![Project Architecture](./project-architecture.png)
+![Project Architecture] <img width="7615" height="4746" alt="Image" src="https://github.com/user-attachments/assets/7c398115-f1cb-42ea-967b-2d1372a4c793" />
 
 *Diagram shows the overall architecture of the ProjectFlow application including frontend, backend, database, and external services.*
-
-```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ CLIENT BROWSER                                                             │
-│ ┌─────────────────────────────────────────────────────────────────────────┐ │
-│ │ React + TypeScript                                                     │ │
-│ │ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐      │ │
-│ │ │Dashboard │ │ Projects │ │ Tasks    │ │ Team     │ │ Calendar │      │ │
-│ │ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘      │ │
-│ │ ┌──────────────────────────────────────────────────────────────┐        │ │
-│ │ │ Custom Hooks & Context                                      │        │ │
-│ │ │ useAuth │ useProjects │ useTasks │ useTeams │ useChat       │        │ │
-│ │ └──────────────────────────────────────────────────────────────┘        │ │
-│ │ ┌──────────────────────────────────────────────────────────────┐        │ │
-│ │ │ API Service Layer (Axios)                                   │        │ │
-│ │ └──────────────────────────────────────────────────────────────┘        │ │
-│ └─────────────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────┬───────────────────────────────────────────┘
-                                  │ HTTP/HTTPS + WebSocket (STOMP)
-                                  ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ SPRING BOOT BACKEND                                                        │
-│ ┌─────────────────────────────────────────────────────────────────────┐    │
-│ │ CONTROLLER LAYER                                                    │    │
-│ │ AuthController │ UserController │ TeamController │ ProjectController│    │
-│ │ TaskController │ SearchController │ NotificationController          │    │
-│ └─────────────────────────────────────────────────────────────────────┘    │
-│                                                                             │
-│ ┌─────────────────────────────────────────────────────────────────────┐    │
-│ │ SERVICE LAYER                                                       │    │
-│ │ AccountService │ TeamService │ ProjectService │ TaskService         │    │
-│ │ EmailService │ FileStorageService │ AuthenticationService           │    │
-│ └─────────────────────────────────────────────────────────────────────┘    │
-│                                                                             │
-│ ┌─────────────────────────────────────────────────────────────────────┐    │
-│ │ REPOSITORY LAYER                                                    │    │
-│ │ UserRepository │ TeamRepository │ ProjectRepository │ TaskRepository│    │
-│ └─────────────────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────┬───────────────────────────────────────────┘
-                                  │
-        ┌─────────────────────────┼─────────────────────────┐
-        ▼                         ▼                         ▼
-┌───────────────┐       ┌───────────────┐       ┌───────────────────┐
-│ MySQL Database│       │ Kafka Broker │       │ File System       │
-│ (JPA/Hibernate) │     │ (Port 9092)  │       │ (Uploads/Photos)  │
-└───────────────┘       └───────────────┘       └───────────────────┘
-```
 
 ---
 
 # 🖥️ System Architecture Diagram
 
-![System Architecture Diagram](./system-architecture.png)
+![System Architecture Diagram] <img width="9271" height="4934" alt="Image" src="https://github.com/user-attachments/assets/4891ae7b-7c33-4428-a9f2-78f58a7fbe38" />
 
 *Complete system architecture showing all components and their interactions.*
 
@@ -178,7 +131,7 @@ flowchart TB
 
 # 🗄️ Database Structure
 
-![Database Structure](./database-structure.png)
+![Database Structure] <img width="6938" height="8128" alt="Image" src="https://github.com/user-attachments/assets/e9914865-540a-4028-a018-bec65858139c" />
 
 Complete database schema showing all tables and their relationships.
 
@@ -188,7 +141,7 @@ Complete database schema showing all tables and their relationships.
 
 ## Database Tables Detail
 
-![Database Tables Detail](./database-tables-detail.png)
+![Database Tables Detail] <img width="1698" height="1282" alt="Image" src="https://github.com/user-attachments/assets/81e00ebe-ecaf-4436-a1a5-edadd8ff8b6f" />
 
 Detailed view of all database tables with column names and data types.
 
@@ -196,7 +149,7 @@ Detailed view of all database tables with column names and data types.
 
 # 🔐 Authentication Flow Diagram
 
-![Authentication Flow Diagram](./authentication-flow.png)
+![Authentication Flow Diagram] <img width="4861" height="4801" alt="Image" src="https://github.com/user-attachments/assets/cef2cd60-7437-40d1-9085-dc5cd9921590" />
 
 Sequence diagram showing the complete authentication process including login, registration, and password reset.
 
@@ -204,7 +157,7 @@ Sequence diagram showing the complete authentication process including login, re
 
 # 📡 Real-time Pipeline Diagram
 
-![Real-time Pipeline Diagram](./realtime-pipeline.png)
+![Real-time Pipeline Diagram] <img width="7783" height="1314" alt="Image" src="https://github.com/user-attachments/assets/3f9bdada-4af5-4759-9e5a-cc9ae8fede94" />
 
 Event-driven architecture showing Kafka pipeline for real-time metrics processing.
 
