@@ -20,6 +20,7 @@ import Settings from './pages/Settings';
 import TaskDetails from './components/tasks/TaskDetails';
 import ForgotPassword from './components/auth/ForgotPassword';
 import ResetPassword from './components/auth/ResetPassword';
+import OAuth2Redirect from './components/auth/OAuth2Redirect';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,6 +42,7 @@ const App: React.FC = () => {
               <Route path="/register" element={<Register />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/oauth2/redirect" element={<OAuth2Redirect />} />
               <Route element={<ProtectedRoute />}>
                 <Route path="/" element={<Layout />}>
                   <Route index element={<Navigate to="/dashboard" replace />} />

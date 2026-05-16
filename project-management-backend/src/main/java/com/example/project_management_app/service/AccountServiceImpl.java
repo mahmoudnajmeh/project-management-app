@@ -18,6 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Service
 @Transactional
@@ -267,5 +268,29 @@ public class AccountServiceImpl implements AccountService {
         return passwordResetTokenRepository.findByToken(token)
                 .map(PasswordResetToken::isValid)
                 .orElse(false);
+    }
+
+    @Override
+    public User processOAuthLogin(String email, String name, String provider) {
+        return userRepository.findByEmail(email)
+                .map(user -> {
+                    user.setLastActivity(LocalDateTime.now());
+                    if (user.getProvider() == null) {
+                        user.setProvider(provider);
+                    }
+                    return userRepository.save(user);
+                })
+                .orElseGet(() -> {
+                    User newUser = new User();
+                    newUser.setEmail(email);
+                    newUser.setUsername(email.split("@")[0] + "_" + provider);
+                    newUser.setFirstName(name.split(" ")[0]);
+                    newUser.setLastName(name.split(" ").length > 1 ? name.split(" ")[1] : "");
+                    newUser.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+                    newUser.setRole(User.Role.ROLE_USER);
+                    newUser.setProvider(provider);
+                    newUser.setLastActivity(LocalDateTime.now());
+                    return userRepository.save(newUser);
+                });
     }
 }

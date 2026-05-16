@@ -16,4 +16,5 @@ public interface AccountService {
     void sendPasswordResetEmail(ForgotPasswordRequest request) throws Exception;
     void resetPassword(ResetPasswordRequest request);
     boolean validateResetToken(String token);
+    User processOAuthLogin(String email, String name, String provider);
 }
