@@ -29,7 +29,7 @@ public class AIAssistantService {
     @Autowired
     private UserRepository userRepository;
 
-    @Value("${ai.api.key:}")
+    @Value("${OPENAI_API_KEY:}")
     private String apiKey;
 
     private final RestTemplate restTemplate = new RestTemplate();

@@ -293,4 +293,12 @@ public class AccountServiceImpl implements AccountService {
                     return userRepository.save(newUser);
                 });
     }
+
+    @Override
+    public void updateUserActivity(Long userId) {
+        userRepository.findById(userId).ifPresent(user -> {
+            user.setLastActivity(LocalDateTime.now());
+            userRepository.save(user);
+        });
+    }
 }

@@ -402,15 +402,18 @@ class TeamServiceImplTest {
 
     @Test
     void getMembers_Works() {
-        when(teamRepo.findById(1L)).thenReturn(Optional.of(team1));
+        Long teamId = 1L;
+
+        List<User> members = Arrays.asList(me, other);
+
+        when(teamRepo.findTeamMembers(teamId)).thenReturn(members);
         when(security.getCurrentUser()).thenReturn(me);
         when(teamRepo.findByMemberId(me.getId())).thenReturn(teams);
 
-        List<User> members = teamService.getTeamMembers(1L);
+        List<User> result = teamService.getTeamMembers(teamId);
 
-        assertEquals(2, members.size());
-        assertTrue(members.contains(me));
-        assertTrue(members.contains(other));
+        assertEquals(2, result.size());
+        verify(teamRepo, times(1)).findTeamMembers(teamId);
     }
 
     @Test

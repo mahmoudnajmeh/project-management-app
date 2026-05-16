@@ -91,7 +91,7 @@ public class ActivityController {
             }
         }
 
-        // Sort by createdAt descending (most recent first)
+        // Sort by createdAt descending
         activities.sort(Comparator.comparing(ActivityResponseDto::getCreatedAt).reversed());
 
         return ResponseEntity.ok(activities);

@@ -5,6 +5,7 @@ import com.example.project_management_app.entity.Project;
 import com.example.project_management_app.entity.Task;
 import com.example.project_management_app.entity.Team;
 import com.example.project_management_app.entity.User;
+import com.example.project_management_app.pipeline.event.ActivityEventPublisher;
 import com.example.project_management_app.repository.ProjectRepository;
 import com.example.project_management_app.repository.TaskRepository;
 import com.example.project_management_app.repository.TeamRepository;
@@ -63,6 +64,9 @@ class TaskServiceImplTest {
 
     @Captor
     private ArgumentCaptor<String> notificationTypeCaptor;
+
+    @Mock
+    private ActivityEventPublisher activityEventPublisher;
 
     private User currentUser;
     private User assignedUser;

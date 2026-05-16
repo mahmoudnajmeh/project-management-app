@@ -1,6 +1,5 @@
 package com.example.project_management_app.security;
 
-import com.example.project_management_app.config.JwtAuthenticationFilter;
 import com.example.project_management_app.util.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;

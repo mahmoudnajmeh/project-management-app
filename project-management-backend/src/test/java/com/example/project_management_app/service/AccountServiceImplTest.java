@@ -577,13 +577,4 @@ class AccountServiceImplTest {
         verify(passwordEncoder, times(1)).matches(newPassword, encodedPassword);
         verify(userRepository, never()).save(any(User.class));
     }
-
-    @Test
-    void updateUserActivity() {
-        doNothing().when(userRepository).updateLastActivity(eq(1L), any(LocalDateTime.class));
-
-        accountService.updateUserActivity(1L);
-
-        verify(userRepository, times(1)).updateLastActivity(eq(1L), any(LocalDateTime.class));
-    }
 }

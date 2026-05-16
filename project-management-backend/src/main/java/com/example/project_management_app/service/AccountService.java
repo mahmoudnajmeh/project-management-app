@@ -17,4 +17,5 @@ public interface AccountService {
     void resetPassword(ResetPasswordRequest request);
     boolean validateResetToken(String token);
     User processOAuthLogin(String email, String name, String provider);
+    void updateUserActivity(Long userId);
 }
