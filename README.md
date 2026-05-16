@@ -36,7 +36,7 @@ Built with **Spring Boot 3.2.0** and **React 18 + TypeScript**
 
 # 🖥️ System Architecture Diagram
 
-![System Architecture Diagram] <img width="9271" height="4934" alt="Image" src="https://github.com/user-attachments/assets/4891ae7b-7c33-4428-a9f2-78f58a7fbe38" />
+System Architecture Diagram <img width="9271" height="4934" alt="Image" src="https://github.com/user-attachments/assets/4891ae7b-7c33-4428-a9f2-78f58a7fbe38" />
 
 *Complete system architecture showing all components and their interactions.*
 
