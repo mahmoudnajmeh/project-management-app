@@ -278,7 +278,7 @@ project-management-app/
 ## 1. Clone & Setup Backend
 
 ```bash
-git clone https://github.com/yourusername/project-management-app.git
+git clone https://github.com/mahmoudnajmeh/project-management-app.git
 cd project-management-app
 
 mysql -u root -p
