@@ -1,6 +1,6 @@
 # 📊 ProjectFlow - Project Management Application
 
-**A full-stack application with Spring AI, Real-time Notification System, Data Engineering pipeline (Kafka + Spring Batch), real-time analytics, team collaboration, and task tracking.**
+**A full-stack application with Spring AI, Real-time Notification System, Data Engineering pipeline (Kafka + Spring Batch), real-time analytics, team collaboration, OAuth2 (Google/GitHub login), and task tracking.**
 
 Built with **Spring Boot 3.2.0** and **React 18 + TypeScript**
 
@@ -113,9 +113,9 @@ Event-driven architecture showing Kafka pipeline for real-time metrics processin
 - **Real-time WebSocket push** - No page refresh needed for new notifications
 - **Notification types**: TASK_ASSIGNED, TASK_COMPLETED, PROJECT_CREATED, MESSAGE_RECEIVED, CALENDAR_EVENT
 
-## 🔐 Authentication & Security
+### 🔐 Authentication & Security
 - JWT-based authentication with refresh tokens
-- OAuth2 integration (Google, GitHub)
+- **OAuth2 Integration (Google + GitHub)** - Single sign-on with social providers
 - Password reset via email
 - Role-based access control (USER, ADMIN)
 
