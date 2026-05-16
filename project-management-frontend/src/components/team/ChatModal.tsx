@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   X, Send, Paperclip, Smile, Check, CheckCheck, Download, 
-  FileText, FileSpreadsheet, FileArchive, FileCode, FileImage, 
+  FileText, FileSpreadsheet, FileArchive, FileCode, 
   FileVideo, FileAudio, File, Image as ImageIcon, XCircle, Maximize2 
 } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
@@ -32,7 +32,6 @@ interface FileAttachment {
   fileUrl: string;
   isImage: boolean;
   isPdf: boolean;
-  isOffice: boolean;
   extension: string;
 }
 
@@ -135,11 +134,9 @@ const ChatModal: React.FC<ChatModalProps> = ({
           const fileData: FileData = JSON.parse(line.substring(2));
           const extension = fileData.originalName.split('.').pop()?.toLowerCase() || '';
           const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'];
-          const officeExtensions = ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'];
           
           const isImage = imageExtensions.includes(extension);
           const isPdf = extension === 'pdf';
-          const isOffice = officeExtensions.includes(extension);
           
           files.push({
             storedName: fileData.storedName,
@@ -147,7 +144,6 @@ const ChatModal: React.FC<ChatModalProps> = ({
             fileUrl: `http://localhost:8080/api/chat/file/${fileData.storedName}`,
             isImage: isImage,
             isPdf: isPdf,
-            isOffice: isOffice,
             extension: extension
           });
         } catch (e) {
@@ -224,14 +220,17 @@ const ChatModal: React.FC<ChatModalProps> = ({
       sendTyping();
       lastTypingSentRef.current = now;
     }
-  }, [message, sendTyping]);
 
-  const clearTypingTimeout = useCallback(() => {
     if (typingTimeoutRef.current) {
       window.clearTimeout(typingTimeoutRef.current);
-      typingTimeoutRef.current = null;
     }
-  }, []);
+    
+    if (message.trim()) {
+      typingTimeoutRef.current = window.setTimeout(() => {
+        typingTimeoutRef.current = null;
+      }, 3000);
+    }
+  }, [message, sendTyping]);
 
   const formatTime = (timestamp: string) => {
     try {
@@ -257,20 +256,13 @@ const ChatModal: React.FC<ChatModalProps> = ({
 
   const handleFileClick = (file: FileAttachment) => {
     if (file.isImage) {
-      // Open image in popup modal
       handleImageClick(file.fileUrl, file.originalName);
-    } else if (file.isPdf) {
-      // Open PDF in new tab
-      window.open(file.fileUrl, '_blank');
     } else {
-      // For Word, Excel, PowerPoint, Java files, etc. - open in new tab
-      // The browser will either display them or download based on settings
       window.open(file.fileUrl, '_blank');
     }
   };
 
   const handleDownloadClick = (file: FileAttachment) => {
-    // Force download with correct filename
     const link = document.createElement('a');
     link.href = file.fileUrl;
     link.download = file.originalName;
@@ -357,7 +349,6 @@ const ChatModal: React.FC<ChatModalProps> = ({
           <div className="fixed inset-0 bg-black bg-opacity-50" onClick={onClose}></div>
           
           <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl">
-            {/* Header */}
             <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-6 py-4">
               <div className="flex items-center space-x-3">
                 <div className="relative">
@@ -391,7 +382,6 @@ const ChatModal: React.FC<ChatModalProps> = ({
               </button>
             </div>
 
-            {/* Messages */}
             <div className="h-[500px] flex flex-col">
               <div {...getRootProps()} className={`flex-1 overflow-y-auto p-6 space-y-4 ${isDragActive ? 'bg-blue-50' : ''}`}>
                 <input {...getInputProps()} />
@@ -451,7 +441,6 @@ const ChatModal: React.FC<ChatModalProps> = ({
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Attachments preview */}
               {attachments.length > 0 && (
                 <div className="border-t border-gray-200 dark:border-gray-700 p-2 max-h-32 overflow-y-auto">
                   <div className="flex flex-wrap gap-2">
@@ -478,7 +467,6 @@ const ChatModal: React.FC<ChatModalProps> = ({
                 </div>
               )}
 
-              {/* Input */}
               <div className="border-t border-gray-200 dark:border-gray-700 p-4">
                 <form onSubmit={handleSendMessage} className="flex items-center space-x-2">
                   <input type="file" id="fileInput" onChange={handleFileSelect} multiple className="hidden" />
@@ -523,7 +511,6 @@ const ChatModal: React.FC<ChatModalProps> = ({
         </div>
       </div>
 
-      {/* Image Popup Modal */}
       {selectedImage && (
         <div 
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-90 p-4"

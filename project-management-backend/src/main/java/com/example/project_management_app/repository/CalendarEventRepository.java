@@ -11,20 +11,20 @@ import java.util.List;
 @Repository
 public interface CalendarEventRepository extends JpaRepository<CalendarEvent, Long> {
 
-    @Query("SELECT e FROM CalendarEvent e WHERE e.createdBy = :userId")
+    @Query("SELECT e FROM CalendarEvent e WHERE e.creator.id = :userId")
     List<CalendarEvent> findByCreatedBy(@Param("userId") Long userId);
 
-    @Query("SELECT e FROM CalendarEvent e WHERE (e.eventDate BETWEEN :startDate AND :endDate OR e.endDate BETWEEN :startDate AND :endDate) AND e.createdBy = :userId")
+    @Query("SELECT e FROM CalendarEvent e WHERE (e.eventDate BETWEEN :startDate AND :endDate OR e.endDate BETWEEN :startDate AND :endDate) AND e.creator.id = :userId")
     List<CalendarEvent> findEventsBetweenDates(@Param("userId") Long userId,
                                                @Param("startDate") LocalDateTime startDate,
                                                @Param("endDate") LocalDateTime endDate);
 
-    @Query("SELECT e FROM CalendarEvent e WHERE e.type = :type AND e.createdBy = :userId")
+    @Query("SELECT e FROM CalendarEvent e WHERE e.type = :type AND e.creator.id = :userId")
     List<CalendarEvent> findByType(@Param("userId") Long userId, @Param("type") String type);
 
-    @Query("SELECT e FROM CalendarEvent e WHERE e.projectId = :projectId AND e.createdBy = :userId")
+    @Query("SELECT e FROM CalendarEvent e WHERE e.projectId = :projectId AND e.creator.id = :userId")
     List<CalendarEvent> findByProjectId(@Param("userId") Long userId);
 
-    @Query("SELECT e FROM CalendarEvent e WHERE e.eventDate >= :date AND e.createdBy = :userId ORDER BY e.eventDate ASC")
+    @Query("SELECT e FROM CalendarEvent e WHERE e.eventDate >= :date AND e.creator.id = :userId ORDER BY e.eventDate ASC")
     List<CalendarEvent> findUpcomingEvents(@Param("userId") Long userId, @Param("date") LocalDateTime date);
 }

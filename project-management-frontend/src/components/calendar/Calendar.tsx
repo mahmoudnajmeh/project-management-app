@@ -8,6 +8,8 @@ import LoadingSpinner from '../common/LoadingSpinner';
 import { useToast } from '../../hooks/useToast';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, subMonths, addDays, isSameMonth, isSameDay } from 'date-fns';
 import api from '../../api/api';
+import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
 
 interface CalendarEvent {
   id: number;
@@ -26,6 +28,15 @@ interface CalendarEvent {
   endDate?: Date;
   eventDate: string;
   createdBy?: number;
+  creator?: { 
+    id: number;
+    username: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    profilePictureFileName?: string;
+    profilePictureUrl?: string;
+  };
 }
 
 interface NewEventForm {
@@ -54,6 +65,9 @@ const Calendar: React.FC = () => {
   const [isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [searchParams] = useSearchParams();
+  const eventIdParam = searchParams.get('eventId');
+  const { user } = useAuth();
   
   const { success, error } = useToast();
 
@@ -84,6 +98,7 @@ const Calendar: React.FC = () => {
       projectId: event.projectId,
       assignedUserId: event.assignedUserId,
       createdBy: event.createdBy,
+      creator: event.creator,
       ...(event.endDate && { endDate: new Date(event.endDate) }),
     }));
     return calendarEvents;
@@ -108,6 +123,16 @@ const Calendar: React.FC = () => {
 
     fetchEvents();
   }, []);
+
+  useEffect(() => {
+    if (eventIdParam) {
+      const eventToOpen = events.find(e => e.id === parseInt(eventIdParam));
+      if (eventToOpen) {
+        setSelectedEvent(eventToOpen);
+        setIsEventModalOpen(true);
+      }
+    }
+  }, [eventIdParam, events]);
 
   const getEventColor = (type: string, priority?: string) => {
     switch (type) {
@@ -553,16 +578,18 @@ const Calendar: React.FC = () => {
                 </div>
               </div>
               <div className="text-right">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleEditEventClick(event);
-                  }}
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
+                {user && event.creator?.id === user.id && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEditEventClick(event);
+                    }}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
             </div>
           </Card>
@@ -986,7 +1013,7 @@ const Calendar: React.FC = () => {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
               <div>
                 <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date & Time</h4>
                 <p className="text-gray-900 dark:text-white">{format(selectedEvent.date, 'EEEE, MMMM d, yyyy')}</p>
@@ -1006,27 +1033,62 @@ const Calendar: React.FC = () => {
                 </div>
               )}
             </div>
+            {selectedEvent.creator && (
+              <div className="flex items-center space-x-3 pt-4 mt-2 border-t border-gray-200 dark:border-gray-700">
+                {selectedEvent.creator.profilePictureFileName ? (
+                  <img
+                    src={`/api/users/profile-picture/${selectedEvent.creator.profilePictureFileName}?t=${Date.now()}`}
+                    alt="Creator"
+                    className="h-8 w-8 rounded-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                      if (fallback) fallback.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <div
+                  className={`h-8 w-8 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center ${
+                    selectedEvent.creator.profilePictureFileName ? 'hidden' : 'flex'
+                  }`}
+                >
+                  <span className="text-sm font-bold text-white">
+                    {selectedEvent.creator.firstName?.[0] || selectedEvent.creator.username?.[0] || 'U'}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Created by</p>
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    {selectedEvent.creator.firstName} {selectedEvent.creator.lastName}
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="flex justify-end space-x-3 pt-4">
-              <Button
-                variant="danger"
-                onClick={handleDeleteConfirm}
-                className="flex items-center"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setIsEventModalOpen(false);
-                  handleEditEventClick(selectedEvent);
-                }}
-                className="flex items-center"
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Edit
-              </Button>
+              {user && selectedEvent?.creator?.id === user.id && (
+                <>
+                  <Button
+                    variant="danger"
+                    onClick={handleDeleteConfirm}
+                    className="flex items-center"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setIsEventModalOpen(false);
+                      handleEditEventClick(selectedEvent);
+                    }}
+                    className="flex items-center"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         )}

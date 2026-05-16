@@ -20,4 +20,6 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
 
     @Query("SELECT DISTINCT u FROM Team t JOIN t.members u WHERE t.id = :teamId")
     List<User> findTeamMembers(@Param("teamId") Long teamId);
+
+    List<Team> findByNameContainingIgnoreCase(String name);
 }

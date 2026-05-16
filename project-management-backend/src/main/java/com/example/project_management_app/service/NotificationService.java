@@ -113,19 +113,20 @@ public class NotificationService {
     }
 
     private void sendUnreadCountNotification(Long userId) {
-        Long unreadCount = notificationRepository.countUnreadByUser(
-                userRepository.findById(userId).orElse(null)
-        );
+        User user = userRepository.findById(userId).orElse(null);
+        if (user != null) {
+            Long unreadCount = notificationRepository.countUnreadByUser(user);
 
-        Map<String, Object> countNotification = new HashMap<>();
-        countNotification.put("type", "UNREAD_COUNT_UPDATE");
-        countNotification.put("unreadCount", unreadCount);
-        countNotification.put("timestamp", LocalDateTime.now());
+            Map<String, Object> countNotification = new HashMap<>();
+            countNotification.put("type", "UNREAD_COUNT_UPDATE");
+            countNotification.put("unreadCount", unreadCount);
+            countNotification.put("timestamp", LocalDateTime.now());
 
-        messagingTemplate.convertAndSendToUser(
-                userId.toString(),
-                "/queue/notifications",
-                countNotification
-        );
+            messagingTemplate.convertAndSendToUser(
+                    userId.toString(),
+                    "/queue/notifications",
+                    countNotification
+            );
+        }
     }
 }

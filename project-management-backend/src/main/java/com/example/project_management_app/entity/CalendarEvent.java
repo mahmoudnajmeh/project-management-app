@@ -37,7 +37,10 @@ public class CalendarEvent {
 
     private Long projectId;
     private Long assignedUserId;
-    private Long createdBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by")
+    private User creator;
 
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime createdAt;
@@ -58,6 +61,7 @@ public class CalendarEvent {
 
     public CalendarEvent() {}
 
+    // Getters and setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getTitle() { return title; }
@@ -82,8 +86,8 @@ public class CalendarEvent {
     public void setProjectId(Long projectId) { this.projectId = projectId; }
     public Long getAssignedUserId() { return assignedUserId; }
     public void setAssignedUserId(Long assignedUserId) { this.assignedUserId = assignedUserId; }
-    public Long getCreatedBy() { return createdBy; }
-    public void setCreatedBy(Long createdBy) { this.createdBy = createdBy; }
+    public User getCreator() { return creator; }
+    public void setCreator(User creator) { this.creator = creator; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

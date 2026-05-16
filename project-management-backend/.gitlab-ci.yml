@@ -1,0 +1,51 @@
+image: maven:3.9-openjdk-21
+
+stages:
+  - build
+  - test
+  - package
+  - deploy
+
+variables:
+  MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+
+cache:
+  paths:
+    - .m2/repository/
+    - src/main/frontend/node_modules/
+
+build-frontend:
+  stage: build
+  image: node:18
+  script:
+    - cd src/main/frontend
+    - npm install
+    - npm run build
+  artifacts:
+    paths:
+      - src/main/frontend/build/
+
+build-backend:
+  stage: build
+  script:
+    - mvn clean package -DskipTests
+  artifacts:
+    paths:
+      - target/*.jar
+
+test:
+  stage: test
+  script:
+    - mvn test
+  artifacts:
+    reports:
+      junit:
+        - target/surefire-reports/TEST-*.xml
+
+deploy:
+  stage: deploy
+  only:
+    - main
+  script:
+    - scp target/*.jar user@server:/opt/app/
+    - ssh user@server 'cd /opt/app && docker-compose restart'

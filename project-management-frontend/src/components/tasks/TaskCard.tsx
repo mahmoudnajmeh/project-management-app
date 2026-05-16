@@ -41,31 +41,25 @@ const TaskCard: React.FC<TaskCardProps> = ({ task }) => {
     }
   };
 
-  // Check if current user can modify this task (edit details, delete, etc.)
+
   const canModifyTask = () => {
     if (!user) return false;
     
-    // Only task assignee can modify their own tasks
     if (task.assignedUser && task.assignedUser.id === user.id) {
       return true;
     }
-    
-    // Note: Project creator permissions should be handled in backend
-    // Frontend hides buttons, backend validates
-    
     return false;
   };
 
-  // Check if current user can update task status
+
   const canUpdateStatus = () => {
     if (!user) return false;
     
-    // Only task assignee can update their own task status
+
     if (task.assignedUser && task.assignedUser.id === user.id) {
       return true;
     }
     
-    // No one else can update task status
     return false;
   };
 

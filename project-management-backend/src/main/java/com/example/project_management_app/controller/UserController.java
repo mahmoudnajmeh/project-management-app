@@ -1,12 +1,14 @@
 package com.example.project_management_app.controller;
 
 import com.example.project_management_app.dto.InvitationRequest;
+import com.example.project_management_app.dto.PasswordChangeRequest;
 import com.example.project_management_app.dto.UserDto;
 import com.example.project_management_app.entity.User;
 import com.example.project_management_app.repository.UserRepository;
 import com.example.project_management_app.service.AccountService;
 import com.example.project_management_app.service.EmailService;
 import com.example.project_management_app.service.FileStorageService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -184,6 +186,21 @@ public class UserController {
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("error", "Failed to send invitation: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        }
+    }
+
+    @PostMapping("/me/change-password")
+    public ResponseEntity<?> changePassword(@Valid @RequestBody PasswordChangeRequest passwordRequest) {
+        try {
+            accountService.changePassword(passwordRequest);
+
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Password changed successfully");
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
         }
     }
 }

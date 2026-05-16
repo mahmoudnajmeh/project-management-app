@@ -46,7 +46,6 @@ public class ChatService {
         response.setSenderName(sender.getUsername());
         response.setSenderAvatar(getAvatarUrl(sender));
 
-        // Only send chat notification for CHAT messages, not for project/task notifications
         if (chatMessageDto.getType() == ChatMessage.MessageType.CHAT) {
             sendNotification(receiver.getId(), "New message from " + sender.getUsername());
         }

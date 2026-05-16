@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { LogIn, Mail, Lock } from 'lucide-react';
+import { LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
@@ -21,6 +21,7 @@ const Login: React.FC = () => {
   const { login } = useAuth();
   const { success, error } = useToast();
   const navigate = useNavigate();
+  const [showPassword, setShowPassword] = useState(false);
   
   const {
     register,
@@ -68,14 +69,37 @@ const Login: React.FC = () => {
                 leftIcon={<Mail className="h-4 w-4 text-gray-400" />}
                 error={errors.username?.message}
               />
-              <Input
-                {...register('password')}
-                type="password"
-                label="Password"
-                placeholder="Enter your password"
-                leftIcon={<Lock className="h-4 w-4 text-gray-400" />}
-                error={errors.password?.message}
-              />
+              <div>
+                <Input
+                  {...register('password')}
+                  type={showPassword ? 'text' : 'password'}
+                  label="Password"
+                  placeholder="Enter your password"
+                  leftIcon={<Lock className="h-4 w-4 text-gray-400" />}
+                  rightIcon={
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="focus:outline-none"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-gray-400" />
+                      )}
+                    </button>
+                  }
+                  error={errors.password?.message}
+                />
+                <div className="text-right mt-1">
+                  <Link
+                    to="/forgot-password"
+                    className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
+              </div>
             </CardContent>
             <CardFooter>
               <Button

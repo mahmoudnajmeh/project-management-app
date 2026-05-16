@@ -1,7 +1,6 @@
 import api from '.';
 import type { AuthUser } from '../types/auth';
-import type { ProfilePictureResponse } from '../types/user';
-import type { UserUpdateRequest } from '../types/user';
+import type { ProfilePictureResponse, UserUpdateRequest, PasswordChangeRequest } from '../types/user';
 
 export const usersApi = {
   getCurrentUser: () => 
@@ -15,6 +14,9 @@ export const usersApi = {
     
   deleteUser: () => 
     api.delete('/users/me'),
+    
+  changePassword: (data: PasswordChangeRequest) =>
+    api.post('/users/me/change-password', data),
     
   uploadProfilePicture: (file: File) => {
     const formData = new FormData();

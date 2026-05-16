@@ -1,10 +1,15 @@
 package com.example.project_management_app.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
+import net.minidev.json.annotate.JsonIgnore;
+
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "teams")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Team {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,9 +29,17 @@ public class Team {
             joinColumns = @JoinColumn(name = "team_id"),
             inverseJoinColumns = @JoinColumn(name = "user_id")
     )
-    private java.util.List<User> members;
+    @JsonIgnore
+    private List<User> members;
 
     private LocalDateTime createdAt;
+
+    // Team photo fields
+    private String teamPhotoFileName;
+    private String teamPhotoContentType;
+    private Long teamPhotoSize;
+    private String teamPhotoPath;
+    private String teamPhotoUrl;
 
     @PrePersist
     protected void onCreate() {
@@ -49,8 +62,19 @@ public class Team {
     public void setDescription(String description) { this.description = description; }
     public User getCreatedBy() { return createdBy; }
     public void setCreatedBy(User createdBy) { this.createdBy = createdBy; }
-    public java.util.List<User> getMembers() { return members; }
-    public void setMembers(java.util.List<User> members) { this.members = members; }
+    public List<User> getMembers() { return members; }
+    public void setMembers(List<User> members) { this.members = members; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public String getTeamPhotoFileName() { return teamPhotoFileName; }
+    public void setTeamPhotoFileName(String teamPhotoFileName) { this.teamPhotoFileName = teamPhotoFileName; }
+    public String getTeamPhotoContentType() { return teamPhotoContentType; }
+    public void setTeamPhotoContentType(String teamPhotoContentType) { this.teamPhotoContentType = teamPhotoContentType; }
+    public Long getTeamPhotoSize() { return teamPhotoSize; }
+    public void setTeamPhotoSize(Long teamPhotoSize) { this.teamPhotoSize = teamPhotoSize; }
+    public String getTeamPhotoPath() { return teamPhotoPath; }
+    public void setTeamPhotoPath(String teamPhotoPath) { this.teamPhotoPath = teamPhotoPath; }
+    public String getTeamPhotoUrl() { return teamPhotoUrl; }
+    public void setTeamPhotoUrl(String teamPhotoUrl) { this.teamPhotoUrl = teamPhotoUrl; }
 }

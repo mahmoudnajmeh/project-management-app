@@ -8,6 +8,7 @@ import com.example.project_management_app.entity.User;
 import com.example.project_management_app.repository.CalendarEventRepository;
 import com.example.project_management_app.repository.ProjectRepository;
 import com.example.project_management_app.repository.TeamRepository;
+import com.example.project_management_app.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +33,9 @@ public class CalendarEventServiceImpl implements CalendarEventService {
     private TeamRepository teamRepository;
 
     @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
     private AccountService accountService;
 
     @Autowired
@@ -54,7 +58,7 @@ public class CalendarEventServiceImpl implements CalendarEventService {
         event.setColor(eventDto.getColor());
         event.setProjectId(eventDto.getProjectId());
         event.setAssignedUserId(eventDto.getAssignedUserId());
-        event.setCreatedBy(currentUser.getId());
+        event.setCreator(currentUser);
 
         if (eventDto.getEventDate() != null && !eventDto.getEventDate().isEmpty()) {
             event.setEventDate(LocalDateTime.parse(eventDto.getEventDate()));
@@ -91,9 +95,8 @@ public class CalendarEventServiceImpl implements CalendarEventService {
         CalendarEvent event = getEventById(id);
         User currentUser = accountService.getCurrentUser();
 
-        if (!event.getCreatedBy().equals(currentUser.getId()) &&
-                (event.getAssignedUserId() == null || !event.getAssignedUserId().equals(currentUser.getId()))) {
-            throw new RuntimeException("You can only update your own events or events assigned to you");
+        if (!event.getCreator().getId().equals(currentUser.getId())) {
+            throw new RuntimeException("Only the event creator can update this event");
         }
 
         if (eventDto.getTitle() != null) {
@@ -153,9 +156,8 @@ public class CalendarEventServiceImpl implements CalendarEventService {
         CalendarEvent event = getEventById(id);
         User currentUser = accountService.getCurrentUser();
 
-        if (!event.getCreatedBy().equals(currentUser.getId()) &&
-                (event.getAssignedUserId() == null || !event.getAssignedUserId().equals(currentUser.getId()))) {
-            throw new RuntimeException("You can only delete your own events or events assigned to you");
+        if (!event.getCreator().getId().equals(currentUser.getId())) {
+            throw new RuntimeException("Only the event creator can delete this event");
         }
 
         List<User> teamMembers = userService.getUsersInSameTeam(currentUser);
@@ -176,13 +178,24 @@ public class CalendarEventServiceImpl implements CalendarEventService {
 
     @Override
     public CalendarEvent getEventById(Long id) {
-        return calendarEventRepository.findById(id)
+        CalendarEvent event = calendarEventRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Calendar event not found with id: " + id));
+
+        // Fetch creator details
+        if (event.getCreator() != null) {
+            event.getCreator().getFirstName();
+            event.getCreator().getLastName();
+            event.getCreator().getProfilePictureFileName();
+        }
+
+        return event;
     }
 
     @Override
     public List<CalendarEvent> getAllEvents() {
-        return calendarEventRepository.findAll();
+        List<CalendarEvent> events = calendarEventRepository.findAll();
+        enrichEventsWithCreatorDetails(events);
+        return events;
     }
 
     @Override
@@ -204,7 +217,10 @@ public class CalendarEventServiceImpl implements CalendarEventService {
         Set<CalendarEvent> allEvents = new HashSet<>(userEvents);
         allEvents.addAll(teamEvents);
 
-        return new ArrayList<>(allEvents);
+        List<CalendarEvent> result = new ArrayList<>(allEvents);
+        enrichEventsWithCreatorDetails(result);
+
+        return result;
     }
 
     @Override
@@ -231,7 +247,10 @@ public class CalendarEventServiceImpl implements CalendarEventService {
         Set<CalendarEvent> allEvents = new HashSet<>(userEvents);
         allEvents.addAll(teamEvents);
 
-        return new ArrayList<>(allEvents);
+        List<CalendarEvent> result = new ArrayList<>(allEvents);
+        enrichEventsWithCreatorDetails(result);
+
+        return result;
     }
 
     @Override
@@ -257,12 +276,29 @@ public class CalendarEventServiceImpl implements CalendarEventService {
         Set<CalendarEvent> allEvents = new HashSet<>(userEvents);
         allEvents.addAll(teamEvents);
 
-        return new ArrayList<>(allEvents);
+        List<CalendarEvent> result = new ArrayList<>(allEvents);
+        enrichEventsWithCreatorDetails(result);
+
+        return result;
     }
 
     @Override
     public List<CalendarEvent> getProjectEvents(Long projectId) {
-        return calendarEventRepository.findByProjectId(projectId);
+        List<CalendarEvent> events = calendarEventRepository.findByProjectId(projectId);
+        enrichEventsWithCreatorDetails(events);
+        return events;
+    }
+
+    private void enrichEventsWithCreatorDetails(List<CalendarEvent> events) {
+        for (CalendarEvent event : events) {
+            if (event.getCreator() != null) {
+                User creator = event.getCreator();
+                creator.getFirstName();
+                creator.getLastName();
+                creator.getProfilePictureFileName();
+                creator.getProfilePictureUrl();
+            }
+        }
     }
 
     private String getEventColor(String type, String priority) {

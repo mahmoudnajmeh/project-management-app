@@ -36,4 +36,6 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
             "LEFT JOIN FETCH t.project " +
             "LEFT JOIN FETCH t.assignedUser")
     List<Task> findAll();
+
+    List<Task> findByTitleContainingIgnoreCase(String title);
 }

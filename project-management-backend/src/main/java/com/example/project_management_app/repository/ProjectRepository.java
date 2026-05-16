@@ -15,9 +15,6 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     @Query("SELECT DISTINCT p FROM Project p LEFT JOIN FETCH p.createdBy WHERE p.createdBy = :user")
     List<Project> findByCreatedBy(@Param("user") User user);
 
-    @Query("SELECT DISTINCT p FROM Project p LEFT JOIN FETCH p.createdBy WHERE p.name LIKE %:name%")
-    List<Project> findByNameContainingIgnoreCase(@Param("name") String name);
-
     @Query("SELECT DISTINCT p FROM Project p LEFT JOIN FETCH p.createdBy")
     List<Project> findAll();
 
@@ -28,4 +25,6 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
 
     @Query("SELECT DISTINCT p FROM Project p LEFT JOIN FETCH p.createdBy WHERE p.team = :team")
     List<Project> findByTeam(@Param("team") Team team);
+
+    List<Project> findByNameContainingIgnoreCase(String name);
 }

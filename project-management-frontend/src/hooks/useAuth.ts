@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authApi } from '../api/auth';
 import { usersApi } from '../api/users';
+import { oauthApi } from '../api/oauth';
 import type { AuthUser } from '../types/auth';
 
 export const useAuth = () => {
@@ -78,8 +79,37 @@ export const useAuth = () => {
     }
   };
 
+  const oauthLogin = async (provider: string) => {
+    try {
+      setIsLoading(true);
+      const response = await oauthApi.getAuthorizationUrl(provider);
+      window.location.href = response.data.url;
+    } catch (error: any) {
+      console.error('OAuth login error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleOAuthRedirect = async () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    const username = urlParams.get('username');
+
+    if (token && username) {
+      localStorage.setItem('token', token);
+      localStorage.setItem('username', username);
+      await loadCurrentUser();
+      return true;
+    }
+    return false;
+  };
+
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('username');
+    localStorage.removeItem('email');
     setUser(null); 
     navigate('/login');
   };
@@ -89,44 +119,60 @@ export const useAuth = () => {
   };
 
   const updateUser = async (updatedData: Partial<AuthUser>) => {
-    try {
-      setIsLoading(true);
-      
-      const previousUser = user;
-      
-      setUser(prev => prev ? { ...prev, ...updatedData } : null);
-      
-      if (updatedData.firstName || updatedData.lastName || updatedData.email) {
-        const updatePayload = {
-          firstName: updatedData.firstName,
-          lastName: updatedData.lastName,
-          email: updatedData.email,
-        };
+  try {
+    setIsLoading(true);
+    
+    const previousUser = user;
+    
+    setUser(prev => prev ? { ...prev, ...updatedData } : null);
+    
+    const updatePayload: any = {};
+    if (updatedData.firstName !== undefined) updatePayload.firstName = updatedData.firstName;
+    if (updatedData.lastName !== undefined) updatePayload.lastName = updatedData.lastName;
+    if (updatedData.email !== undefined) updatePayload.email = updatedData.email;
+    if (updatedData.username !== undefined) updatePayload.username = updatedData.username;
+    
+    if (Object.keys(updatePayload).length > 0) {
+      try {
+        const response = await usersApi.updateUser(updatePayload);
         
-        try {
-          const response = await usersApi.updateUser(updatePayload);
-          setUser(response.data);
-          return response.data;
-        } catch (error) {
-          console.error('API update failed, reverting:', error);
-          setUser(previousUser);
-          throw error;
+        // If username changed, log out and require re-login
+        if (updatedData.username && updatedData.username !== previousUser?.username) {
+          // Show message to user
+          alert('Username changed! Please log in again with your new username.');
+          // Clear token and log out
+          localStorage.removeItem('token');
+          localStorage.removeItem('username');
+          localStorage.removeItem('email');
+          setUser(null);
+          navigate('/login');
+          return null;
         }
-      } else {
-        return user;
+        
+        setUser(response.data);
+        return response.data;
+      } catch (error) {
+        console.error('API update failed, reverting:', error);
+        setUser(previousUser);
+        throw error;
       }
-    } catch (error) {
-      console.error('Failed to update user:', error);
-      throw error;
-    } finally {
-      setIsLoading(false);
+    } else {
+      return user;
     }
-  };
+  } catch (error) {
+    console.error('Failed to update user:', error);
+    throw error;
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return {
     user,
     login,
     register,
+    oauthLogin,
+    handleOAuthRedirect,
     logout,
     getToken,
     isLoading,

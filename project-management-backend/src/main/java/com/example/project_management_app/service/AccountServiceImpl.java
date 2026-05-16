@@ -1,8 +1,9 @@
 package com.example.project_management_app.service;
 
-import com.example.project_management_app.dto.LoginRequest;
-import com.example.project_management_app.dto.UserDto;
+import com.example.project_management_app.dto.*;
+import com.example.project_management_app.entity.PasswordResetToken;
 import com.example.project_management_app.entity.User;
+import com.example.project_management_app.repository.PasswordResetTokenRepository;
 import com.example.project_management_app.repository.UserRepository;
 import com.example.project_management_app.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +34,12 @@ public class AccountServiceImpl implements AccountService {
 
     @Autowired
     private FileStorageService fileStorageService;
+
+    @Autowired
+    private PasswordResetTokenRepository passwordResetTokenRepository;
+
+    @Autowired
+    private EmailService emailService;
 
     @Override
     public User registerUser(UserDto userDto) {
@@ -86,6 +93,15 @@ public class AccountServiceImpl implements AccountService {
         if (userDto.getLastName() != null) {
             currentUser.setLastName(userDto.getLastName());
         }
+
+        // ADD THIS BLOCK - Allow username change
+        if (userDto.getUsername() != null && !userDto.getUsername().equals(currentUser.getUsername())) {
+            if (userRepository.existsByUsername(userDto.getUsername())) {
+                throw new RuntimeException("Username is already taken");
+            }
+            currentUser.setUsername(userDto.getUsername());
+        }
+
         if (userDto.getEmail() != null && !userDto.getEmail().equals(currentUser.getEmail())) {
             if (userRepository.existsByEmail(userDto.getEmail())) {
                 throw new RuntimeException("Email is already in use");
@@ -158,7 +174,98 @@ public class AccountServiceImpl implements AccountService {
         return userRepository.save(currentUser);
     }
 
-    public void updateUserActivity(Long userId) {
-        userRepository.updateLastActivity(userId, LocalDateTime.now());
+    @Override
+    public void changePassword(PasswordChangeRequest passwordRequest) {
+        User currentUser = getCurrentUser();
+
+        // Verify current password
+        if (!passwordEncoder.matches(passwordRequest.getCurrentPassword(), currentUser.getPassword())) {
+            throw new RuntimeException("Current password is incorrect");
+        }
+
+        // Check if new password and confirm password match
+        if (!passwordRequest.getNewPassword().equals(passwordRequest.getConfirmPassword())) {
+            throw new RuntimeException("New password and confirmation do not match");
+        }
+
+        // Check if new password is same as old password
+        if (passwordEncoder.matches(passwordRequest.getNewPassword(), currentUser.getPassword())) {
+            throw new RuntimeException("New password must be different from current password");
+        }
+
+        // Encode and set new password
+        currentUser.setPassword(passwordEncoder.encode(passwordRequest.getNewPassword()));
+        currentUser.setLastActivity(LocalDateTime.now());
+
+        userRepository.save(currentUser);
+    }
+
+    @Override
+    public void sendPasswordResetEmail(ForgotPasswordRequest request) throws Exception {
+        System.out.println("=== PASSWORD RESET REQUEST ===");
+        System.out.println("Looking for email: " + request.getEmail());
+
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> {
+                    System.out.println("❌ Email not found: " + request.getEmail());
+                    return new RuntimeException("No user found with this email address");
+                });
+
+        System.out.println("✅ User found: " + user.getEmail());
+        System.out.println("User name: " + user.getFirstName() + " " + user.getLastName());
+
+        // Delete any existing reset tokens for this user
+        passwordResetTokenRepository.deleteByUser(user);
+        System.out.println("Deleted existing reset tokens");
+
+        // Generate new token
+        String token = java.util.UUID.randomUUID().toString();
+        PasswordResetToken resetToken = new PasswordResetToken(token, user);
+        passwordResetTokenRepository.save(resetToken);
+        System.out.println("Generated new reset token: " + token);
+
+        // Send email
+        String resetLink = "http://localhost:3000/reset-password?token=" + token;
+        System.out.println("Reset link: " + resetLink);
+
+        try {
+            emailService.sendPasswordResetEmail(user.getEmail(), resetLink, user.getFirstName());
+            System.out.println("✅ Email sending completed");
+        } catch (Exception e) {
+            System.err.println("❌ Email sending failed: " + e.getMessage());
+            throw e;
+        }
+    }
+
+    @Override
+    public void resetPassword(ResetPasswordRequest request) {
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new RuntimeException("Passwords do not match");
+        }
+
+        PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(request.getToken())
+                .orElseThrow(() -> new RuntimeException("Invalid or expired reset token"));
+
+        if (!resetToken.isValid()) {
+            throw new RuntimeException("Reset token has expired or already been used");
+        }
+
+        User user = resetToken.getUser();
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+            throw new RuntimeException("New password must be different from current password");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        resetToken.setUsed(true);
+        passwordResetTokenRepository.save(resetToken);
+    }
+
+    @Override
+    public boolean validateResetToken(String token) {
+        return passwordResetTokenRepository.findByToken(token)
+                .map(PasswordResetToken::isValid)
+                .orElse(false);
     }
 }

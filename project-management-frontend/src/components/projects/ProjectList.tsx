@@ -14,7 +14,6 @@ const ProjectList: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  // Ensure myProjects is always an array
   const projectsArray = Array.isArray(myProjects) ? myProjects : [];
   
   const filteredProjects = projectsArray.filter((project) => {

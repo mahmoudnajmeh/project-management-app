@@ -95,4 +95,33 @@ public class EmailService {
             throw new RuntimeException("Invalid invitation token");
         }
     }
+
+    public void sendPasswordResetEmail(String toEmail, String resetLink, String firstName) throws MessagingException {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(toEmail);
+            helper.setSubject("Reset Your ProjectFlow Password");
+
+            String htmlContent = "<!DOCTYPE html>" +
+                    "<html><body>" +
+                    "<h2>Hello " + firstName + ",</h2>" +
+                    "<p>We received a request to reset your password.</p>" +
+                    "<p>Click the link below to reset your password:</p>" +
+                    "<a href='" + resetLink + "'>Reset Password</a>" +
+                    "<p>This link will expire in 1 hour.</p>" +
+                    "<p>If you didn't request this, please ignore this email.</p>" +
+                    "</body></html>";
+
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+            System.out.println("✅ Email sent successfully to " + toEmail);
+
+        } catch (Exception e) {
+            System.err.println("❌ Failed to send email: " + e.getMessage());
+            throw e;
+        }
+    }
 }

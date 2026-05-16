@@ -5,6 +5,7 @@ import com.example.project_management_app.entity.Project;
 import com.example.project_management_app.entity.Task;
 import com.example.project_management_app.entity.Team;
 import com.example.project_management_app.entity.User;
+import com.example.project_management_app.pipeline.event.ActivityEventPublisher;
 import com.example.project_management_app.repository.ProjectRepository;
 import com.example.project_management_app.repository.TaskRepository;
 import com.example.project_management_app.repository.TeamRepository;
@@ -43,6 +44,9 @@ public class TaskServiceImpl implements TaskService {
 
     @Autowired
     private NotificationService notificationService;
+
+    @Autowired
+    private ActivityEventPublisher activityEventPublisher;
 
     @Override
     public Task createTask(TaskDto taskDto) {
@@ -84,6 +88,9 @@ public class TaskServiceImpl implements TaskService {
                 currentUser.getFirstName() + " " + currentUser.getLastName()
         );
 
+        // Publish event for data pipeline
+        activityEventPublisher.publishTaskCreated(savedTask, currentUser);
+
         return savedTask;
     }
 
@@ -92,7 +99,7 @@ public class TaskServiceImpl implements TaskService {
         Task task = getTaskById(id);
         User currentUser = accountService.getCurrentUser();
 
-        // Check authorization
+        // Check authorization FIRST
         boolean canUpdate = checkTaskAuthorization(task, currentUser);
         if (!canUpdate) {
             throw new RuntimeException("You are not authorized to update this task");
@@ -159,6 +166,11 @@ public class TaskServiceImpl implements TaskService {
                 currentUser.getFirstName() + " " + currentUser.getLastName()
         );
 
+        // Publish event ONLY when task is completed
+        if (isStatusChanged && task.getStatus() == Task.TaskStatus.DONE) {
+            activityEventPublisher.publishTaskCompleted(updatedTask, currentUser);
+        }
+
         return updatedTask;
     }
 
@@ -167,7 +179,6 @@ public class TaskServiceImpl implements TaskService {
         Task task = getTaskById(id);
         User currentUser = accountService.getCurrentUser();
 
-        // Check authorization
         boolean canDelete = checkTaskAuthorization(task, currentUser);
         if (!canDelete) {
             throw new RuntimeException("You are not authorized to delete this task");
@@ -195,18 +206,15 @@ public class TaskServiceImpl implements TaskService {
     }
 
     private boolean checkTaskAuthorization(Task task, User currentUser) {
-        // 1. Task assignee can update/delete their own tasks
         if (task.getAssignedUser() != null && task.getAssignedUser().getId().equals(currentUser.getId())) {
             return true;
         }
 
-        // 2. Project creator can update/delete any task in their project
         if (task.getProject().getCreatedBy() != null &&
                 task.getProject().getCreatedBy().getId().equals(currentUser.getId())) {
             return true;
         }
 
-        // 3. Team lead/manager can update/delete tasks (check if user is team owner)
         if (task.getProject().getTeam() != null &&
                 task.getProject().getTeam().getCreatedBy() != null &&
                 task.getProject().getTeam().getCreatedBy().getId().equals(currentUser.getId())) {
@@ -242,18 +250,15 @@ public class TaskServiceImpl implements TaskService {
 
         Set<Task> allTasks = new HashSet<>();
 
-        // 1. Get tasks assigned to the user
         List<Task> assignedTasks = taskRepository.findByAssignedUser(currentUser);
         allTasks.addAll(assignedTasks);
 
-        // 2. Get tasks from projects created by the user
         List<Project> createdProjects = projectRepository.findByCreatedBy(currentUser);
         for (Project project : createdProjects) {
             List<Task> projectTasks = taskRepository.findByProject(project);
             allTasks.addAll(projectTasks);
         }
 
-        // 3. Get tasks from projects where user is a team member
         List<Team> userTeams = teamRepository.findByMemberId(currentUser.getId());
         for (Team team : userTeams) {
             List<Project> teamProjects = projectRepository.findByTeam(team);
@@ -263,7 +268,6 @@ public class TaskServiceImpl implements TaskService {
             }
         }
 
-        // 4. Get tasks from projects where user has assigned tasks (already covered, but included for completeness)
         List<Project> projectsWithAssignedTasks = projectRepository.findByTasksAssignedUser(currentUser);
         for (Project project : projectsWithAssignedTasks) {
             List<Task> projectTasks = taskRepository.findByProject(project);

@@ -32,21 +32,14 @@ const Dashboard: React.FC = () => {
   const [recentProjects, setRecentProjects] = useState<Project[]>([]);
   const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
 
-  useEffect(() => {
-    fetchTeamStats();
-  }, []);
-
   const fetchTeamStats = async () => {
     try {
       setIsLoadingTeamStats(true);
-      // Fetch all users
       const response = await api.get('/users');
       const allUsers = response.data;
       
-      // Calculate total members
       const totalMembers = allUsers.length;
       
-      // Calculate new members in the last 30 days
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
@@ -65,7 +58,6 @@ const Dashboard: React.FC = () => {
       });
     } catch (error) {
       console.error('Failed to fetch team stats:', error);
-      // Fallback to default values if API fails
       setTeamStats({
         totalMembers: 1,
         newMembers: 0,
@@ -75,6 +67,10 @@ const Dashboard: React.FC = () => {
       setIsLoadingTeamStats(false);
     }
   };
+
+  useEffect(() => {
+    fetchTeamStats();
+  }, []);
 
   useEffect(() => {
     if (myProjects && Array.isArray(myProjects)) {
@@ -95,25 +91,22 @@ const Dashboard: React.FC = () => {
     }
   }, [myTasks]);
 
-  // Calculate project stats
   const totalProjects = myProjects?.length || 0;
-  const previousPeriodProjects = Math.max(0, totalProjects - 2); // Example calculation
+  const previousPeriodProjects = Math.max(0, totalProjects - 2);
   const projectChange = previousPeriodProjects > 0 
     ? `+${Math.round(((totalProjects - previousPeriodProjects) / previousPeriodProjects) * 100)}%`
     : '+0%';
 
-  // Calculate task stats
   const activeTasks = myTasks?.filter((t: Task) => t.status !== 'DONE')?.length || 0;
-  const previousPeriodTasks = Math.max(0, activeTasks - 1); // Example calculation
+  const previousPeriodTasks = Math.max(0, activeTasks - 1); 
   const taskChange = previousPeriodTasks > 0 
     ? `+${Math.round(((activeTasks - previousPeriodTasks) / previousPeriodTasks) * 100)}%`
     : '+0%';
 
-  // Calculate overdue stats
   const overdueTasks = myTasks?.filter((t: Task) => 
     new Date(t.dueDate) < new Date() && t.status !== 'DONE'
   )?.length || 0;
-  const previousPeriodOverdue = Math.max(0, overdueTasks + 1); // Example calculation
+  const previousPeriodOverdue = Math.max(0, overdueTasks + 1); 
   const overdueChange = previousPeriodOverdue > 0 
     ? `-${Math.round(((previousPeriodOverdue - overdueTasks) / previousPeriodOverdue) * 100)}%`
     : '-0%';

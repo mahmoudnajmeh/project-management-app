@@ -19,7 +19,7 @@ const profileSchema = z.object({
 type ProfileFormData = z.infer<typeof profileSchema>;
 
 const ProfileForm: React.FC = () => {
-  const { user, updateUser } = useAuth(); // Remove refreshUser - not needed
+  const { user, updateUser } = useAuth();
   const { success, error } = useToast();
   
   const {
@@ -54,9 +54,9 @@ const ProfileForm: React.FC = () => {
         firstName: data.firstName,
         lastName: data.lastName,
         email: data.email,
+        username: data.username,
       };
       
-      // Let updateUser handle everything - it updates local state immediately AND calls API
       await updateUser(updateData);
       
       success('Profile updated successfully!');
@@ -101,7 +101,6 @@ const ProfileForm: React.FC = () => {
         placeholder="johndoe"
         leftIcon={<User className="h-4 w-4 text-gray-400" />}
         error={errors.username?.message}
-        disabled
       />
 
       <div className="flex justify-end pt-4">

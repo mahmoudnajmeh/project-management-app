@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { UserPlus, User, Mail, Lock, Hash, Eye, EyeOff } from 'lucide-react';
+import { UserPlus, User, Mail, Lock, Hash, Eye, EyeOff, Github, Chrome } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
@@ -28,10 +28,11 @@ const registerSchema = z.object({
 type RegisterFormData = z.infer<typeof registerSchema>;
 
 const Register: React.FC = () => {
-  const { register: registerUser } = useAuth();
+  const { register: registerUser, oauthLogin, handleOAuthRedirect } = useAuth();
   const { success, error } = useToast();
   const navigate = useNavigate();
-  const [showPassword, setShowPassword] = React.useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<string | null>(null);
   
   const {
     register,
@@ -72,6 +73,18 @@ const Register: React.FC = () => {
     return 'Strong';
   };
 
+  useEffect(() => {
+    const checkOAuthRedirect = async () => {
+      const isOAuthRedirect = await handleOAuthRedirect();
+      if (isOAuthRedirect) {
+        success('Successfully logged in with OAuth2!');
+        navigate('/dashboard');
+      }
+    };
+    
+    checkOAuthRedirect();
+  }, [handleOAuthRedirect, navigate, success]);
+
   const onSubmit = async (data: RegisterFormData) => {
     try {
       await registerUser(data);
@@ -79,6 +92,16 @@ const Register: React.FC = () => {
       navigate('/login');
     } catch (err: any) {
       error(err.response?.data?.error || 'Registration failed');
+    }
+  };
+
+  const handleOAuthLogin = async (provider: string) => {
+    try {
+      setOauthLoading(provider);
+      await oauthLogin(provider);
+    } catch (err) {
+      error(`Failed to initiate ${provider} login`);
+      setOauthLoading(null);
     }
   };
 
@@ -232,10 +255,28 @@ const Register: React.FC = () => {
             </div>
           </div>
           <div className="mt-6 grid grid-cols-2 gap-3">
-            <button className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">
+            <button
+              onClick={() => handleOAuthLogin('google')}
+              disabled={oauthLoading !== null}
+              className="w-full inline-flex justify-center items-center py-2 px-4 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {oauthLoading === 'google' ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-500 mr-2"></div>
+              ) : (
+                <Chrome className="h-4 w-4 mr-2" />
+              )}
               Google
             </button>
-            <button className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">
+            <button
+              onClick={() => handleOAuthLogin('github')}
+              disabled={oauthLoading !== null}
+              className="w-full inline-flex justify-center items-center py-2 px-4 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {oauthLoading === 'github' ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-500 mr-2"></div>
+              ) : (
+                <Github className="h-4 w-4 mr-2" />
+              )}
               GitHub
             </button>
           </div>

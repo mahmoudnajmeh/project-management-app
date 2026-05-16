@@ -26,16 +26,28 @@ interface UseChatProps {
   onNotification?: (notification: any) => void;
 }
 
+const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+let globalStompClient: Client | null = null;
+let globalConnectionAttempts = 0;
+let globalIsConnected = false;
+const globalSubscriptions = new Set<string>();
+
 export const useChat = ({ receiverId, onMessageReceived, onNotification }: UseChatProps = {}) => {
   const { user } = useAuth();
   const { error } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(globalIsConnected);
   const [typingUsers, setTypingUsers] = useState<Set<number>>(new Set());
   const stompClient = useRef<Client | null>(null);
   const reconnectAttempts = useRef(0);
   const isConnecting = useRef(false);
   const hasLoadedInitialMessages = useRef(false);
+  const maxReconnectAttempts = 10;
+  const mounted = useRef(true);
+  const heartbeatInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const connectionTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const subscriptionsRef = useRef<Set<string>>(new Set());
 
   const loadExistingMessages = useCallback(async () => {
     if (!user || !receiverId || hasLoadedInitialMessages.current) return;
@@ -70,13 +82,93 @@ export const useChat = ({ receiverId, onMessageReceived, onNotification }: UseCh
     }
   }, [receiverId, loadExistingMessages]);
 
+  const startHeartbeat = useCallback(() => {
+    if (heartbeatInterval.current) {
+      clearInterval(heartbeatInterval.current);
+    }
+    
+    heartbeatInterval.current = setInterval(() => {
+      if (stompClient.current?.connected && user) {
+        stompClient.current.publish({
+          destination: '/app/heartbeat',
+          body: JSON.stringify({ 
+            userId: user.id, 
+            timestamp: new Date().toISOString() 
+          })
+        });
+        if (isDevelopment) {
+          console.log('Heartbeat sent');
+        }
+      }
+    }, 25000);
+  }, [user]);
+
+  const disconnect = useCallback(() => {
+    subscriptionsRef.current.clear();
+  }, []);
+
   const connect = useCallback(() => {
     if (!user || !user.id) {
-      console.warn('No user or user ID found, skipping WebSocket connection');
       return;
     }
 
-    if (stompClient.current?.connected || isConnecting.current) {
+    if (globalStompClient?.connected) {
+      stompClient.current = globalStompClient;
+      setIsConnected(true);
+      
+      if (receiverId && !globalSubscriptions.has(`messages-${receiverId}`)) {
+        globalSubscriptions.add(`messages-${receiverId}`);
+        globalStompClient.subscribe(`/user/${user.id}/queue/messages`, (message: IMessage) => {
+          if (!mounted.current) return;
+          
+          try {
+            const parsedMessage = JSON.parse(message.body);
+            if (parsedMessage.type === 'CHAT' && 
+                (parsedMessage.senderId === receiverId || parsedMessage.receiverId === receiverId)) {
+              handleMessage(parsedMessage);
+            }
+          } catch (e) {
+            console.error('Error parsing message:', e);
+          }
+        });
+      }
+      
+      if (receiverId && !globalSubscriptions.has(`typing-${receiverId}`)) {
+        globalSubscriptions.add(`typing-${receiverId}`);
+        globalStompClient.subscribe(`/user/${user.id}/queue/typing`, (message: IMessage) => {
+          if (!mounted.current || !receiverId) return;
+          
+          try {
+            const parsedMessage = JSON.parse(message.body);
+            if (parsedMessage.type === 'TYPING' && parsedMessage.senderId === receiverId) {
+              handleMessage(parsedMessage);
+            }
+          } catch (e) {
+            console.error('Error parsing typing message:', e);
+          }
+        });
+      }
+      
+      if (receiverId && !globalSubscriptions.has(`read-${receiverId}`)) {
+        globalSubscriptions.add(`read-${receiverId}`);
+        globalStompClient.subscribe(`/user/${user.id}/queue/read`, (message: IMessage) => {
+          if (!mounted.current || !receiverId) return;
+          
+          try {
+            const parsedMessage = JSON.parse(message.body);
+            if (parsedMessage.type === 'READ_RECEIPT' && parsedMessage.senderId === receiverId) {
+              handleMessage(parsedMessage);
+            }
+          } catch (e) {
+            console.error('Error parsing read receipt:', e);
+          }
+        });
+      }
+      
+      return;
+    }
+
+    if (isConnecting.current) {
       return;
     }
 
@@ -88,32 +180,93 @@ export const useChat = ({ receiverId, onMessageReceived, onNotification }: UseCh
 
     isConnecting.current = true;
 
+    if (isDevelopment) {
+      console.log('🔌 Creating WebSocket connection...');
+    }
+
     const client = new Client({
       webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
       reconnectDelay: 5000,
-      heartbeatIncoming: 4000,
-      heartbeatOutgoing: 4000,
+      heartbeatIncoming: 10000,
+      heartbeatOutgoing: 10000,
       connectHeaders: {
         Authorization: `Bearer ${token}`
       },
       debug: (str) => {
-        if (str.includes('ERROR:') || str.includes('error:')) {
-          console.error('STOMP Error:', str);
+        if (isDevelopment && (str.includes('ERROR') || str.includes('error'))) {
+          console.log('STOMP:', str);
         }
       },
       onConnect: () => {
+        if (!mounted.current) return;
+        
+        if (isDevelopment) {
+          console.log('✅ WebSocket Connected successfully at', new Date().toLocaleTimeString());
+        }
+        
+        globalStompClient = client;
+        globalIsConnected = true;
+        stompClient.current = client;
         setIsConnected(true);
         reconnectAttempts.current = 0;
         isConnecting.current = false;
+        
+        startHeartbeat();
+
+        if (connectionTimeout.current) {
+          clearTimeout(connectionTimeout.current);
+        }
+        connectionTimeout.current = setTimeout(() => {
+          if (stompClient.current?.connected) {
+            if (isDevelopment) {
+              console.log('Connection timeout - sending ping');
+            }
+            stompClient.current.publish({
+              destination: '/app/ping',
+              body: JSON.stringify({ userId: user.id, timestamp: new Date().toISOString() })
+            });
+          }
+        }, 30000);
 
         client.subscribe('/user/queue/errors', (message: IMessage) => {
-          console.error('WebSocket error:', message.body);
+          console.error('❌ Server error:', message.body);
         });
 
         client.subscribe(`/user/${user.id}/queue/notifications`, (message: IMessage) => {
+          if (!mounted.current) return;
+          
           try {
+            if (connectionTimeout.current) {
+              clearTimeout(connectionTimeout.current);
+              connectionTimeout.current = setTimeout(() => {
+                if (stompClient.current?.connected) {
+                  stompClient.current.publish({
+                    destination: '/app/ping',
+                    body: JSON.stringify({ userId: user.id, timestamp: new Date().toISOString() })
+                  });
+                }
+              }, 30000);
+            }
+
             const parsedMessage = JSON.parse(message.body);
-            console.log('WebSocket notification received in useChat:', parsedMessage);
+            
+            if (isDevelopment) {
+              console.log('📨 Notification received:', parsedMessage.type, 'at', new Date().toLocaleTimeString());
+            }
+            
+            const messageTime = parsedMessage.timestamp || parsedMessage.createdAt;
+            if (messageTime) {
+              const msgTime = new Date(messageTime).getTime();
+              const now = new Date().getTime();
+              const ageInSeconds = (now - msgTime) / 1000;
+              
+              if (ageInSeconds > 10) {
+                if (isDevelopment) {
+                  console.log(`⏰ Ignoring old notification (${ageInSeconds.toFixed(1)} seconds old)`);
+                }
+                return;
+              }
+            }
             
             onNotification?.(parsedMessage);
           } catch (e) {
@@ -122,7 +275,13 @@ export const useChat = ({ receiverId, onMessageReceived, onNotification }: UseCh
         });
 
         if (receiverId) {
+          if (isDevelopment) {
+            console.log(`📝 Subscribing to messages for receiver ${receiverId}`);
+          }
+          
           client.subscribe(`/user/${user.id}/queue/messages`, (message: IMessage) => {
+            if (!mounted.current) return;
+            
             try {
               const parsedMessage = JSON.parse(message.body);
               if (parsedMessage.type === 'CHAT' && 
@@ -135,6 +294,8 @@ export const useChat = ({ receiverId, onMessageReceived, onNotification }: UseCh
           });
           
           client.subscribe(`/user/${user.id}/queue/typing`, (message: IMessage) => {
+            if (!mounted.current) return;
+            
             try {
               const parsedMessage = JSON.parse(message.body);
               if (parsedMessage.type === 'TYPING' && parsedMessage.senderId === receiverId) {
@@ -146,6 +307,8 @@ export const useChat = ({ receiverId, onMessageReceived, onNotification }: UseCh
           });
           
           client.subscribe(`/user/${user.id}/queue/read`, (message: IMessage) => {
+            if (!mounted.current) return;
+            
             try {
               const parsedMessage = JSON.parse(message.body);
               if (parsedMessage.type === 'READ_RECEIPT' && parsedMessage.senderId === receiverId) {
@@ -156,44 +319,74 @@ export const useChat = ({ receiverId, onMessageReceived, onNotification }: UseCh
             }
           });
         }
+
+        client.publish({
+          destination: '/app/user.connect',
+          body: JSON.stringify({ 
+            userId: user.id, 
+            timestamp: new Date().toISOString() 
+          })
+        });
       },
-      onStompError: () => {
+      onStompError: (frame) => {
+        if (!mounted.current) return;
+        
+        console.error('❌ STOMP error:', frame);
         setIsConnected(false);
+        globalIsConnected = false;
         isConnecting.current = false;
-        if (reconnectAttempts.current < 5) {
+        
+        if (reconnectAttempts.current < maxReconnectAttempts) {
           reconnectAttempts.current += 1;
+          if (isDevelopment) {
+            console.log(`🔄 Reconnecting... Attempt ${reconnectAttempts.current}/${maxReconnectAttempts}`);
+          }
           setTimeout(connect, 5000);
-        } else {
-          error('Failed to connect to chat server');
         }
       },
-      onWebSocketError: () => {
+      onWebSocketError: (event) => {
+        if (!mounted.current) return;
+        
+        console.error('❌ WebSocket error:', event);
         setIsConnected(false);
+        globalIsConnected = false;
         isConnecting.current = false;
       },
       onDisconnect: () => {
+        if (!mounted.current) return;
+        
+        if (isDevelopment) {
+          console.log('🔌 WebSocket Disconnected at', new Date().toLocaleTimeString());
+        }
+        
         setIsConnected(false);
+        globalIsConnected = false;
         isConnecting.current = false;
+        
+        if (heartbeatInterval.current) {
+          clearInterval(heartbeatInterval.current);
+        }
+        
+        if (user && reconnectAttempts.current < maxReconnectAttempts) {
+          reconnectAttempts.current += 1;
+          if (isDevelopment) {
+            console.log(`🔄 Reconnecting... Attempt ${reconnectAttempts.current}/${maxReconnectAttempts}`);
+          }
+          setTimeout(connect, 5000);
+        }
       }
     });
 
+    globalStompClient = client;
     stompClient.current = client;
     client.activate();
-  }, [user, receiverId, error, onNotification]);
-
-  const disconnect = useCallback(() => {
-    if (stompClient.current) {
-      stompClient.current.deactivate();
-      stompClient.current = null;
-      setIsConnected(false);
-      isConnecting.current = false;
-    }
-  }, []);
+  }, [user, receiverId, onNotification, startHeartbeat]);
 
   const sendMessage = useCallback(async (message: Omit<ChatMessage, 'timestamp'>) => {
     if (!stompClient.current?.connected || !user) {
-      console.warn('Cannot send message: WebSocket not connected or no user');
-      return;
+      console.warn('Cannot send message: WebSocket not connected');
+      connect();
+      return false;
     }
 
     const fullMessage: ChatMessage = {
@@ -212,11 +405,14 @@ export const useChat = ({ receiverId, onMessageReceived, onNotification }: UseCh
           'content-type': 'application/json'
         }
       });
+      
+      return true;
     } catch (err) {
       console.error('Error sending message:', err);
       setMessages(prev => prev.filter(m => m !== fullMessage));
+      return false;
     }
-  }, [user]);
+  }, [user, connect]);
 
   const sendTyping = useCallback(() => {
     if (!stompClient.current?.connected || !user || !receiverId) {
@@ -272,7 +468,7 @@ export const useChat = ({ receiverId, onMessageReceived, onNotification }: UseCh
         return newSet;
       });
       
-      const typingTimer = setTimeout(() => {
+      setTimeout(() => {
         setTypingUsers(prev => {
           const newSet = new Set(prev);
           newSet.delete(message.senderId);
@@ -280,7 +476,6 @@ export const useChat = ({ receiverId, onMessageReceived, onNotification }: UseCh
         });
       }, 3000);
       
-      return () => clearTimeout(typingTimer);
     } else if (message.type === 'READ_RECEIPT') {
       setMessages(prev => prev.map(m => 
         m.senderId === message.senderId && m.receiverId === user?.id 
@@ -303,14 +498,31 @@ export const useChat = ({ receiverId, onMessageReceived, onNotification }: UseCh
   }, [user, onMessageReceived]);
 
   useEffect(() => {
+    mounted.current = true;
+    
     if (user && user.id) {
-      connect();
+      const timer = setTimeout(() => {
+        if (mounted.current) {
+          connect();
+        }
+      }, 100);
+      
+      return () => {
+        clearTimeout(timer);
+        mounted.current = false;
+      };
     }
     
     return () => {
-      disconnect();
+      mounted.current = false;
     };
-  }, [connect, disconnect, user]);
+  }, [user]); 
+
+  useEffect(() => {
+    if (user && user.id && receiverId && stompClient.current?.connected) {
+      connect();
+    }
+  }, [receiverId]);
 
   return {
     messages,

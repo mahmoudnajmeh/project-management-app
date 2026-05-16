@@ -8,7 +8,6 @@ const ProtectedRoute: React.FC = () => {
   const [checkedAuth, setCheckedAuth] = useState(false);
   
   useEffect(() => {
-    // Wait a moment to allow auth context to fully load
     const timer = setTimeout(() => {
       setCheckedAuth(true);
     }, 100);

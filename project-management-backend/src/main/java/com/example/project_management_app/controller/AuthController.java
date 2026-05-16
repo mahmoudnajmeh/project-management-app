@@ -1,6 +1,8 @@
 package com.example.project_management_app.controller;
 
+import com.example.project_management_app.dto.ForgotPasswordRequest;
 import com.example.project_management_app.dto.LoginRequest;
+import com.example.project_management_app.dto.ResetPasswordRequest;
 import com.example.project_management_app.dto.UserDto;
 import com.example.project_management_app.entity.User;
 import com.example.project_management_app.service.AccountService;
@@ -160,5 +162,53 @@ public class AuthController {
     @GetMapping("/test")
     public ResponseEntity<?> test() {
         return ResponseEntity.ok("Auth endpoint is working");
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        System.out.println("=== FORGOT PASSWORD ENDPOINT CALLED ===");
+        System.out.println("Request email: " + request.getEmail());
+
+        try {
+            accountService.sendPasswordResetEmail(request);
+            System.out.println("Password reset email process completed");
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "If an account exists with this email, you will receive a password reset link.");
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            System.out.println("Runtime error: " + e.getMessage());
+            // Don't reveal if email exists or not for security
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "If an account exists with this email, you will receive a password reset link.");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            System.out.println("Unexpected error: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Failed to send reset email. Please try again later.");
+            return ResponseEntity.status(500).body(errorResponse);
+        }
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        try {
+            accountService.resetPassword(request);
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Password has been reset successfully. You can now login with your new password.");
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
+    }
+
+    @GetMapping("/validate-reset-token")
+    public ResponseEntity<?> validateResetToken(@RequestParam String token) {
+        boolean isValid = accountService.validateResetToken(token);
+        Map<String, Boolean> response = new HashMap<>();
+        response.put("valid", isValid);
+        return ResponseEntity.ok(response);
     }
 }

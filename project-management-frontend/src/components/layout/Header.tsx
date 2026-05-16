@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, Bell, Search, Sun, Moon, User, CheckCheck, Trash2 } from 'lucide-react';
+import { Menu, Bell, Search, Sun, Moon, User, CheckCheck, Trash2, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useChat } from '../../hooks/useChat';
 import { chatApi } from '../../api/chat';
 import { notificationApi } from '../../api/notifications';
 import { usersApi } from '../../api/users';
 import ChatModal from '../team/ChatModal';
+import api from '../../api';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -23,11 +24,24 @@ interface Notification {
   entityType?: string;
 }
 
+interface SearchResult {
+  id: number;
+  title: string;
+  type: string;
+  description?: string;
+  projectName?: string;
+  url: string;
+}
+
 const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const { user, logout } = useAuth();
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [selectedChatMember, setSelectedChatMember] = useState<{ 
@@ -55,6 +69,15 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     },
     onNotification: (notification) => {
       console.log('WebSocket notification received:', notification);
+      if (notification.timestamp || notification.createdAt) {
+        const notifTime = new Date(notification.timestamp || notification.createdAt).getTime();
+        const now = new Date().getTime();
+        const timeDiff = now - notifTime;
+        if (timeDiff > 10000) {
+          console.log('Ignoring old notification (age:', Math.round(timeDiff/1000), 'seconds)');
+          return;
+        }
+      }
       
       if (notification.type && notification.content) {
         if (notification.type === 'UNREAD_COUNT_UPDATE') {
@@ -97,7 +120,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     if (user) {
       connect();
       loadAllNotifications();
-      loadAllUsers(); // Load all users to get their profile pictures
+      loadAllUsers();
     }
     
     return () => {
@@ -130,6 +153,35 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     await fetchDatabaseNotifications();
     await fetchChatNotifications();
     await fetchUnreadCount();
+  };
+
+  const handleSearch = async (query: string) => {
+    setSearchQuery(query);
+    
+    if (query.trim().length < 2) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const response = await api.get(`/search?q=${encodeURIComponent(query)}`);
+      setSearchResults(response.data);
+      setShowSearchResults(true);
+    } catch (error) {
+      console.error('Search failed:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleResultClick = (result: SearchResult) => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setShowSearchResults(false);
+    window.location.href = result.url;
   };
 
   const toggleDarkMode = () => {
@@ -218,7 +270,9 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
 
   const markNotificationAsRead = async (notification: Notification) => {
     try {
-      if (notification.type.includes('PROJECT') || notification.type.includes('TASK')) {
+      if (notification.type.includes('PROJECT') || 
+          notification.type.includes('TASK') || 
+          notification.type.includes('CALENDAR_EVENT')) {
         await notificationApi.markAsRead(notification.id);
       } else if (notification.type === 'MESSAGE' && notification.senderId && user) {
         await chatApi.markAsRead(user.id, notification.senderId);
@@ -241,7 +295,6 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
     }
     
     if (notification.type === 'MESSAGE' && notification.senderId && notification.senderName) {
-      // Try to get the sender's profile picture from cached data
       const senderAvatar = userProfiles[notification.senderId]?.avatar;
       
       setSelectedChatMember({
@@ -254,6 +307,8 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
       window.location.href = `/tasks/${notification.entityId}`;
     } else if (notification.type.includes('PROJECT') && notification.entityId) {
       window.location.href = `/projects/${notification.entityId}`;
+    } else if (notification.type.includes('CALENDAR_EVENT') && notification.entityId) {
+      window.location.href = `/calendar?eventId=${notification.entityId}`;
     }
     
     setShowNotifications(false);
@@ -354,15 +409,78 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
               </div>
             </div>
 
-            <div className="flex-1 max-w-2xl mx-4 hidden md:block">
+            <div className="flex-1 max-w-2xl mx-4 hidden md:block relative">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="search"
                   placeholder="Search projects, tasks, or team members..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
                   className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
+                {searchQuery && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSearchResults([]);
+                      setShowSearchResults(false);
+                    }}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                  >
+                    <X className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                  </button>
+                )}
               </div>
+
+              {showSearchResults && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 max-h-96 overflow-y-auto">
+                  {isSearching ? (
+                    <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+                      Searching...
+                    </div>
+                  ) : searchResults.length === 0 ? (
+                    <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+                      No results found for "{searchQuery}"
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="px-4 py-2 border-b border-gray-100 dark:border-gray-700 text-xs font-medium text-gray-500 dark:text-gray-400">
+                        Search Results ({searchResults.length})
+                      </div>
+                      {searchResults.map((result) => (
+                        <div
+                          key={`${result.type}-${result.id}`}
+                          onClick={() => handleResultClick(result)}
+                          className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-0"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900 dark:text-white">
+                                {result.title}
+                              </div>
+                              {result.description && (
+                                <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                  {result.description}
+                                </div>
+                              )}
+                              {result.projectName && (
+                                <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                  Project: {result.projectName}
+                                </div>
+                              )}
+                              <div className="text-xs text-primary-600 dark:text-primary-400 mt-1 capitalize">
+                                {result.type}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex items-center space-x-2">

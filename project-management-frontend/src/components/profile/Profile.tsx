@@ -1,16 +1,15 @@
-// src/components/profile/Profile.tsx
 import React, { useEffect, useState } from 'react';
-import { User, Mail, Calendar, Shield, Camera } from 'lucide-react';
+import { Mail, Calendar, Shield } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import Card, { CardHeader, CardContent } from '../common/Card';
 import ProfilePicture from './ProfilePicture';
 import ProfileForm from './ProfileForm';
+import ChangePassword from './ChangePassword';
 
 const Profile: React.FC = () => {
   const { user, initialLoad } = useAuth();
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
 
-  // Update profile image URL when user changes
   useEffect(() => {
     if (user?.profilePictureFileName) {
       const timestamp = Date.now();
@@ -23,7 +22,6 @@ const Profile: React.FC = () => {
     }
   }, [user]);
 
-  // Show loading state
   if (initialLoad) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -70,31 +68,8 @@ const Profile: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Profile Info */}
         <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader title="Personal Information" />
-            <CardContent>
-              <ProfileForm />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader title="Account Security" />
-            <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <h4 className="font-medium text-gray-900 dark:text-white mb-2">
-                    Change Password
-                  </h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                    Update your password regularly to keep your account secure.
-                  </p>
-                  <button className="btn-primary">
-                    Change Password
-                  </button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <ProfileForm />
+          <ChangePassword />
         </div>
 
         {/* Right Column - Profile Overview */}

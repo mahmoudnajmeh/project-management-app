@@ -1,6 +1,7 @@
 package com.example.project_management_app.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
@@ -11,6 +12,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "users")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "teams"})
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class User {
     @Id
@@ -53,6 +55,12 @@ public class User {
     @OneToMany(mappedBy = "assignedUser")
     @JsonIgnore
     private List<Task> assignedTasks;
+
+    @Column(name = "provider")
+    private String provider;
+
+    @Column(name = "provider_id")
+    private String providerId;
 
     @PrePersist
     protected void onCreate() {
@@ -112,6 +120,22 @@ public class User {
     public void setCreatedProjects(List<Project> createdProjects) { this.createdProjects = createdProjects; }
     public List<Task> getAssignedTasks() { return assignedTasks; }
     public void setAssignedTasks(List<Task> assignedTasks) { this.assignedTasks = assignedTasks; }
+
+    public String getProvider() {
+        return provider;
+    }
+
+    public void setProvider(String provider) {
+        this.provider = provider;
+    }
+
+    public String getProviderId() {
+        return providerId;
+    }
+
+    public void setProviderId(String providerId) {
+        this.providerId = providerId;
+    }
 
     public enum Role {
         ROLE_USER, ROLE_ADMIN

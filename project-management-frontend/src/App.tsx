@@ -15,7 +15,11 @@ import TaskList from './components/tasks/TaskList';
 import Profile from './components/profile/Profile';
 import Team from './components/team/Team';
 import Calendar from './components/calendar/Calendar';
-
+import Reports from './pages/Reports';
+import Settings from './pages/Settings';
+import TaskDetails from './components/tasks/TaskDetails';
+import ForgotPassword from './components/auth/ForgotPassword';
+import ResetPassword from './components/auth/ResetPassword';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,6 +39,8 @@ const App: React.FC = () => {
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route element={<ProtectedRoute />}>
                 <Route path="/" element={<Layout />}>
                   <Route index element={<Navigate to="/dashboard" replace />} />
@@ -43,9 +49,11 @@ const App: React.FC = () => {
                   <Route path="projects/:id" element={<ProjectDetails />} />
                   <Route path="projects/:id/edit" element={<EditProject />} />
                   <Route path="tasks" element={<TaskList />} />
+                  <Route path="tasks/:id" element={<TaskDetails />} />
                   <Route path="profile" element={<Profile />} />
                   <Route path="calendar" element={<Calendar />} />
-                  <Route path="reports" element={<div>Reports</div>} />
+                  <Route path="reports" element={<Reports />} />
+                  <Route path="settings" element={<Settings />} />
                   <Route path="settings" element={<div>Settings</div>} />
                   <Route path="team" element={<Team />} />
                 </Route>
