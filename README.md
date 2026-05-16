@@ -28,7 +28,7 @@ Built with **Spring Boot 3.2.0** and **React 18 + TypeScript**
 
 # 🏗️ Project Architecture
 
-Project Architecture <img width="7615" height="4746" alt="Image" src="https://github.com/user-attachments/assets/7c398115-f1cb-42ea-967b-2d1372a4c793" />
+<img width="7615" height="4746" alt="Image" src="https://github.com/user-attachments/assets/7c398115-f1cb-42ea-967b-2d1372a4c793" />
 
 *Diagram shows the overall architecture of the ProjectFlow application including frontend, backend, database, and external services.*
 
