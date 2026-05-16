@@ -2,6 +2,12 @@
 
 A full-stack project management application built with **Spring Boot 3.2.0** and **React 18 + TypeScript**, featuring real-time updates, team collaboration, task tracking, and event-driven analytics.
 
+## Author
+**Mahmoud Najmeh**  
+<img src="https://avatars.githubusercontent.com/u/78208459?u=c3f9c7d6b49fc9726c5ea8bce260656bcb9654b3&v=4" width="200px" style="border-radius: 50%;">
+
+------------------------------------------------------------------------
+
 ## 📋 Table of Contents
 - [🏗️ Project Architecture](#️-project-architecture)
 - [🖥️ System Architecture Diagram](#️-system-architecture-diagram)
@@ -355,11 +361,5 @@ When adding your images to the documentation, use these exact filenames:
 MIT License
 
 ---
-
-# 👨‍💻 Author
-
-Mahmoud Najmeh
-
-Email: mn.de@outlook.com
 
 Built with ❤️ using Spring Boot, React, and TypeScript
