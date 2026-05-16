@@ -3,18 +3,18 @@
 A full-stack project management application built with **Spring Boot 3.2.0** and **React 18 + TypeScript**, featuring real-time updates, team collaboration, task tracking, and event-driven analytics.
 
 ## 📋 Table of Contents
-- [Project Architecture](#project-architecture)
-- [System Architecture Diagram](#system-architecture-diagram)
-- [Database Structure](#database-structure)
-- [Authentication Flow Diagram](#authentication-flow-diagram)
-- [Real-time Pipeline Diagram](#real-time-pipeline-diagram)
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Quick Start](#quick-start)
-- [API Endpoints](#api-endpoints)
-- [Deployment](#deployment)
-- [Contributing](#contributing)
+- [🏗️ Project Architecture](#️-project-architecture)
+- [🖥️ System Architecture Diagram](#️-system-architecture-diagram)
+- [🗄️ Database Structure](#️-database-structure)
+- [🔐 Authentication Flow Diagram](#-authentication-flow-diagram)
+- [📡 Real-time Pipeline Diagram](#-real-time-pipeline-diagram)
+- [✨ Features](#-features)
+- [🛠️ Tech Stack](#️-tech-stack)
+- [📁 Project Structure](#-project-structure)
+- [🚀 Quick Start](#-quick-start)
+- [📡 API Endpoints](#-api-endpoints)
+- [🐳 Docker Deployment](#-docker-deployment)
+- [🤝 Contributing](#-contributing)
 
 ---
 
