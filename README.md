@@ -380,7 +380,7 @@ When adding your images to the documentation, use these exact filenames:
 
 # 📄 License
 
-MIT License
+This project is licensed under the [MIT License](./LICENSE).
 
 ---
 
