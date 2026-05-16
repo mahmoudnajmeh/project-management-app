@@ -1,6 +1,8 @@
 # 📊 ProjectFlow - Project Management Application
 
-A full-stack project management application built with **Spring Boot 3.2.0** and **React 18 + TypeScript**, featuring real-time updates, team collaboration, task tracking, and event-driven analytics.
+**A full-stack application with Spring AI, Data Engineering pipeline (Kafka + Spring Batch), real-time analytics, team collaboration, and task tracking.**
+
+Built with **Spring Boot 3.2.0** and **React 18 + TypeScript**
 
 ## Author
 **Mahmoud Najmeh**  
@@ -90,6 +92,17 @@ Event-driven architecture showing Kafka pipeline for real-time metrics processin
 ---
 
 # ✨ Features
+
+### 🤖 **Spring AI Integration** (⭐ Core Focus)
+- AI-powered assistant for project management
+- Intelligent task recommendations
+- Automated responses and smart suggestions
+
+### 📊 **Data Engineering & Analytics** (⭐ Core Focus)
+- **Apache Kafka Event Streaming** - Real-time capture and processing of user activities
+- **Spring Batch Processing** - Daily metrics calculation and trend analysis
+- **Real-time Metrics Dashboard** - Live task completion rates and team velocity
+- **User Activity Pipeline** - Event-driven architecture for performance tracking
 
 ## 🔐 Authentication & Security
 - JWT-based authentication with refresh tokens
